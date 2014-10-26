@@ -85,9 +85,11 @@ class glGuiControl(object):
 		pass
 
 class glGuiContainer(glGuiControl):
-	def __init__(self, parent, pos):
+	def __init__(self, parent, pos, layout=None):
+		if not layout:
+			layout = glGuiLayoutButtons
 		self._glGuiControlList = []
-		glGuiLayoutButtons(self)
+		layout(self)
 		super(glGuiContainer, self).__init__(parent, pos)
 
 	def add(self, ctrl):
@@ -325,6 +327,25 @@ class glGuiPanel(glcanvas.GLCanvas):
 	def add(self, ctrl):
 		if self._container is not None:
 			self._container.add(ctrl)
+
+class glHeirarchicalLayout(object):
+	def __init__(self, parent):
+		self._parent = parent
+		self._parent._layout = self
+
+	def update(self):
+		gs = self._parent._base._buttonSize
+		x0, y0, w, h = self._parent.getSize()
+		for ctrl in self._parent._glGuiControlList:
+			pos = ctrl._pos
+			x = x0 + pos[0] * gs
+			y = y0 + pos[1] * gs
+			cw, ch = ctrl.getMinSize()
+			ctrl.setSize(x, y, cw, ch)
+
+	def getLayoutSize(self):
+		_, _, w, h = self._parent.getSize()
+		return w, h
 
 class glGuiLayoutButtons(object):
 	def __init__(self, parent):
@@ -1006,6 +1027,18 @@ class glSlider(glGuiControl):
 		minSize = self.getMinSize()
 		return x0 + w / 2 - minSize[0] / 2, y0 + h / 2 - minSize[1] / 2
 
+	def setBackgroundColor(self):
+		if self.hasFocus():
+			glColor4ub(60,60,60,255)
+		else:
+			glColor4ub(60,60,60,192)
+
+	def setTextColor(self):
+		glColor4ub(0,0,0,255)
+
+	def setNubColor(self):
+		glColor4ub(255,255,255,240)
+
 	def draw(self):
 		if self._hidden:
 			return
@@ -1016,10 +1049,7 @@ class glSlider(glGuiControl):
 		glPushMatrix()
 		glTranslatef(pos[0], pos[1], 0)
 		glDisable(GL_TEXTURE_2D)
-		if self.hasFocus():
-			glColor4ub(60,60,60,255)
-		else:
-			glColor4ub(60,60,60,192)
+		self.setBackgroundColor()
 		glBegin(GL_QUADS)
 		glVertex2f( w/2,-h/2)
 		glVertex2f(-w/2,-h/2)
@@ -1033,7 +1063,7 @@ class glSlider(glGuiControl):
 			valueNormalized = 0
 		glTranslate(0.0,scrollLength/2,0)
 		if True:  # self._focus:
-			glColor4ub(0,0,0,255)
+			self.setTextColor()
 			glPushMatrix()
 			glTranslate(-w/2,openglHelpers.glGetStringSize(str(self._minValue))[1]/2,0)
 			openglHelpers.glDrawStringRight(str(self._minValue))
@@ -1042,7 +1072,7 @@ class glSlider(glGuiControl):
 			glTranslate(w,scrollLength-scrollLength*valueNormalized,0)
 			openglHelpers.glDrawStringLeft(str(self.getValue()))
 			glPopMatrix()
-		glColor4ub(255,255,255,240)
+		self.setNubColor()
 		glTranslate(0.0,-scrollLength*valueNormalized,0)
 		glBegin(GL_QUADS)
 		glVertex2f( w/2,-w/2)
@@ -1089,3 +1119,166 @@ class glSlider(glGuiControl):
 			self._base._focus = None
 			return True
 		return False
+
+class glColorSlider(glSlider):
+	width = 0.2
+	height = 2
+
+	def __init__(self, parent, color, value, pos, callback):
+		super(glColorSlider, self).__init__(parent, value, 0, 256, pos, callback)
+		self._color = color
+
+	def setBackgroundColor(self):
+		value = self.getValue()
+		r = (self._color[0] * value) >> 8
+		g = (self._color[1] * value) >> 8
+		b = (self._color[2] * value) >> 8
+		if self.hasFocus():
+			glColor4ub(r,g,b,255)
+		else:
+			glColor4ub(r,g,b,192)
+
+	def setTextColor(self):
+		glColor4ub(0,0,0,0)
+
+	def setNubColor(self):
+		value = self.getValue()
+		r = ((value + (((256-value) * self._color[0]) >> 8)) * 255) >> 8
+		g = ((value + (((256-value) * self._color[1]) >> 8)) * 255) >> 8
+		b = ((value + (((256-value) * self._color[2]) >> 8)) * 255) >> 8
+		glColor4ub(r,g,b,240)
+
+	def getMinSize(self):
+		return self._base._buttonSize * glColorSlider.width, self._base._buttonSize * glColorSlider.height
+
+class glColorRect(glGuiControl):
+	def __init__(self, parent, pos, width, height, color, callback):
+		self._dims = (width, height)
+		self._color = color
+		self._callback = callback
+		self._hidden = False
+		super(glColorRect, self).__init__(parent, pos)
+
+	def setColor(self, color):
+		self._color = color
+
+	def draw(self):
+		if self._hidden:
+			return
+		x, y, w, h = self.getSize()
+		glDisable(GL_TEXTURE_2D)
+		glColor3f(self._color[0], self._color[1], self._color[2])
+		glBegin(GL_QUADS)
+		glVertex2f(x + w,  y  )
+		glVertex2f(  x  ,  y  )
+		glVertex2f(  x  ,y + h)
+		glVertex2f(x + w,y + h)
+		glEnd()
+
+	def setHidden(self, hidden):
+		self._hidden = hidden
+
+	def getMinSize(self):
+		bs = self._base._buttonSize
+		return self._dims[0]*bs, self._dims[1]*bs
+
+	def _checkHit(self, x, y):
+		x1, y1, w, h = self.getSize()
+		return 0 <= x - x1 <= w and 0 <= y - y1 <= h
+
+	def OnMouseMotion(self, x, y):
+		return False
+
+	def OnMouseDown(self, x, y, button):
+		return False
+
+	def OnMouseUp(self, x, y):
+		if self._hidden:
+			return False
+
+		if self._checkHit(x, y):
+			self._callback(self, x, y)
+			return True
+		return False
+
+class glColorPicker(glGuiContainer):
+	width = 3*glColorSlider.width
+	selectingHeight = glColorSlider.height + width
+	displayHeight = glColorSlider.width
+
+	def __init__(self, parent, pos, initColor, callback):
+		self._callback = callback
+		self._selecting = False
+		super(glColorPicker, self).__init__(parent, pos, glHeirarchicalLayout)
+		sliderWidth = glColorSlider.width
+		offset = sliderWidth/2
+		width = glColorPicker.width
+		shortHeight = glColorPicker.displayHeight
+		sliderOffsetY = glColorSlider.height/2 + width
+		self._redSlider   = glColorSlider(self, (255,0,0), initColor[0], (offset + 0*sliderWidth, sliderOffsetY), lambda: self._updateColor())
+		self._greenSlider = glColorSlider(self, (0,255,0), initColor[1], (offset + 1*sliderWidth, sliderOffsetY), lambda: self._updateColor())
+		self._blueSlider  = glColorSlider(self, (0,0,255), initColor[2], (offset + 2*sliderWidth, sliderOffsetY), lambda: self._updateColor())
+		self._colorSquare = glColorRect(self, (0, 0), width, width, initColor, lambda trigger, x, y: self.exitSelecting())
+		self._thumbnail   = glColorRect(self, (0, 0), width, shortHeight, initColor, lambda trigger, x, y: self.enterSelecting())
+		self.exitSelecting()
+
+	def _updateColor(self):
+		color = self.getColor()
+		self._colorSquare.setColor(color)
+		self._thumbnail.setColor(color)
+		self._callback()
+
+	def _toggleSelecting(self):
+		if self._selecting:
+			self.exitSelecting()
+		else:
+			self.enterSelecting()
+
+	def enterSelecting(self):
+		self._selecting = True
+		self._redSlider.setHidden(False)
+		self._greenSlider.setHidden(False)
+		self._blueSlider.setHidden(False)
+		self._colorSquare.setHidden(False)
+		self._thumbnail.setHidden(True)
+
+	def exitSelecting(self):
+		self._selecting = False
+		self._redSlider.setHidden(True)
+		self._greenSlider.setHidden(True)
+		self._blueSlider.setHidden(True)
+		self._colorSquare.setHidden(True)
+		self._thumbnail.setHidden(False)
+
+	def getColor(self):
+		return (self._redSlider.getValue() / 256.0, self._greenSlider.getValue() / 256.0, self._blueSlider.getValue() / 256.0)
+
+	def getMinSize(self):
+		bs = self._base._buttonSize
+		if self._selecting:
+			return glColorPicker.width*bs, glColorPicker.selectingHeight*bs
+		return glColorPicker.width*bs, glColorPicker.displayHeight*bs
+
+	def draw(self):
+		super(glColorPicker, self).draw()
+		# draw border
+		# TODO: delete this
+		if False:
+			x, y, w, h = self.getSize()
+			w, h = self.getMinSize()
+			glBegin(GL_LINE_LOOP)
+			glColor3f(0,0,0)
+			glVertex2f(  x  ,  y  )
+			glColor3f(.5,.5,.5)
+			glVertex2f(x + w,  y  )
+			glColor3f(1,1,1)
+			glVertex2f(x + w,y + h)
+			glColor3f(.5,.5,.5)
+			glVertex2f(  x  ,y + h)
+			glEnd()
+
+	def OnMouseUp(self, x, y):
+		found = super(glColorPicker, self).OnMouseUp(x, y)
+		if not found and self._selecting:
+			self.exitSelecting()
+		return found

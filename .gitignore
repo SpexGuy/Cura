@@ -9,6 +9,8 @@
 darwin-Cura-*
 win32-Cura-*
 linux-Cura-*
+Cura-*-*-win32
+CuraEngine/
 Printrun
 .idea
 .DS_Store
@@ -28,6 +30,7 @@ scripts/darwin/build/*
 scripts/darwin/Cura.dmg.sparseimage
 scripts/win32/dist/*
 scripts/linux/debian/usr/*
+scripts/clear_comtypes_cache.py
 log.txt
 output.txt
 *.bak
