@@ -48,12 +48,12 @@ class GLShader(GLReferenceCounter):
 			glAttachShader(self._program, vertexShader)
 			glAttachShader(self._program, fragmentShader)
 			glLinkProgram(self._program)
+			if glGetProgramiv(self._program, GL_LINK_STATUS) == GL_FALSE:
+				raise RuntimeError("Link failure: %s" % (glGetProgramInfoLog(self._program)))
 			# Validation has to occur *after* linking
 			glValidateProgram(self._program)
 			if glGetProgramiv(self._program, GL_VALIDATE_STATUS) == GL_FALSE:
 				raise RuntimeError("Validation failure: %s"%(glGetProgramInfoLog(self._program)))
-			if glGetProgramiv(self._program, GL_LINK_STATUS) == GL_FALSE:
-				raise RuntimeError("Link failure: %s" % (glGetProgramInfoLog(self._program)))
 			glDeleteShader(vertexShader)
 			glDeleteShader(fragmentShader)
 		except RuntimeError, e:
@@ -76,10 +76,24 @@ class GLShader(GLReferenceCounter):
 		if self._program is not None:
 			if type(value) is float:
 				glUniform1f(glGetUniformLocation(self._program, name), value)
+			elif type(value) is int:
+				glUniform1i(glGetUniformLocation(self._program, name), value)
 			elif type(value) is numpy.matrix:
 				glUniformMatrix3fv(glGetUniformLocation(self._program, name), 1, False, value.getA().astype(numpy.float32))
 			else:
 				print 'Unknown type for setUniform: %s' % (str(type(value)))
+
+	def setUniformMat4(self, name, value):
+		if self._program is not None:
+			glUniformMatrix4fv(glGetUniformLocation(self._program, name), 1, False, value)
+
+	def setUniformVec4Array(self, name, value):
+		if self._program is not None:
+			glUniform4fv(glGetUniformLocation(self._program, name), len(value), value)
+
+	def setUniformIntArray(self, name, value):
+		if self._program is not None:
+			glUniform1iv(glGetUniformLocation(self._program, name), len(value), value)
 
 	def isValid(self):
 		return self._program is not None
@@ -432,8 +446,8 @@ def unproject(winx, winy, winz, modelMatrix, projMatrix, viewport):
 	ret = list(vector)[0:3] / vector[3]
 	return ret
 
-def convert3x3MatrixTo4x4(matrix):
-	return list(matrix.getA()[0]) + [0] + list(matrix.getA()[1]) + [0] + list(matrix.getA()[2]) + [0, 0,0,0,1]
+def convert3x3MatrixTo4x4(matrix, translation=[0,0,0]):
+	return list(matrix.getA()[0]) + [0] + list(matrix.getA()[1]) + [0] + list(matrix.getA()[2]) + [0] + translation + [1]
 
 def loadGLTexture(filename):
 	tex = glGenTextures(1)
