@@ -103,10 +103,8 @@ class SceneView(openglGui.glGuiPanel):
 
 		self.viewSelection = openglGui.glComboButton(self, _("View mode"), [7,19,11,15,23,23], [_("Normal"), _("Overhang"), _("Transparent"), _("X-Ray"), _("Layers"), _("Colors")], (-1,0), self.OnViewChange)
 
-		self.layerColors = openglGui.glRangeSelect(self, (-1.5, -3), 0, 1950, (0,1,1), lambda: self.updateColor())
-		self.layerColors.setColor(564, (1,0.5,0))
-		self.layerColors.setColor(491, (1,0,0))
-		self.layerColors.setColor(708, (0,0,1))
+		self.layerColors = openglGui.glColorRangeSelect(self, (-1.5, -3), 0, 1950, (0,1,1), lambda: self.updateColor())
+		self.layerColorer = openglGui.glColorPicker(self, (-2, -5.4), (0,1,1), lambda: self.layerColors.setColor(self.layerColorer.getColor()))
 
 		self.youMagineButton = openglGui.glButton(self, 26, _("Share on YouMagine"), (2,0), lambda button: youmagineGui.youmagineManager(self.GetTopLevelParent(), self._scene))
 		self.youMagineButton.setDisabled(True)

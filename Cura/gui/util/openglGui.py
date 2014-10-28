@@ -1208,61 +1208,31 @@ class glColorRect(glGuiControl):
 
 class glColorPicker(glGuiContainer):
 	width = 3*glColorSlider.width
-	selectingHeight = glColorSlider.height + width
-	displayHeight = glColorSlider.width
+	height = glColorSlider.height + width
 
 	def __init__(self, parent, pos, initColor, callback):
 		self._callback = callback
-		self._selecting = False
 		super(glColorPicker, self).__init__(parent, pos, glHeirarchicalLayout)
 		sliderWidth = glColorSlider.width
 		offset = sliderWidth/2
 		width = glColorPicker.width
-		shortHeight = glColorPicker.displayHeight
 		sliderOffsetY = glColorSlider.height/2 + width
-		self._redSlider   = glColorSlider(self, (255,0,0), initColor[0], (offset + 0*sliderWidth, sliderOffsetY), lambda: self._updateColor())
-		self._greenSlider = glColorSlider(self, (0,255,0), initColor[1], (offset + 1*sliderWidth, sliderOffsetY), lambda: self._updateColor())
-		self._blueSlider  = glColorSlider(self, (0,0,255), initColor[2], (offset + 2*sliderWidth, sliderOffsetY), lambda: self._updateColor())
-		self._colorSquare = glColorRect(self, (0, 0), width, width, initColor, lambda trigger, x, y: self.exitSelecting())
-		self._thumbnail   = glColorRect(self, (0, 0), width, shortHeight, initColor, lambda trigger, x, y: self.enterSelecting())
-		self.exitSelecting()
+		self._redSlider   = glColorSlider(self, (255,0,0), initColor[0]*256, (offset + 0*sliderWidth, sliderOffsetY), lambda: self._updateColor())
+		self._greenSlider = glColorSlider(self, (0,255,0), initColor[1]*256, (offset + 1*sliderWidth, sliderOffsetY), lambda: self._updateColor())
+		self._blueSlider  = glColorSlider(self, (0,0,255), initColor[2]*256, (offset + 2*sliderWidth, sliderOffsetY), lambda: self._updateColor())
+		self._colorSquare = glColorRect(self, (0, 0), width, width, initColor, lambda trigger, x, y: self._updateColor())
 
 	def _updateColor(self):
 		color = self.getColor()
 		self._colorSquare.setColor(color)
-		self._thumbnail.setColor(color)
 		self._callback()
-
-	def _toggleSelecting(self):
-		if self._selecting:
-			self.exitSelecting()
-		else:
-			self.enterSelecting()
-
-	def enterSelecting(self):
-		self._selecting = True
-		self._redSlider.setHidden(False)
-		self._greenSlider.setHidden(False)
-		self._blueSlider.setHidden(False)
-		self._colorSquare.setHidden(False)
-		self._thumbnail.setHidden(True)
-
-	def exitSelecting(self):
-		self._selecting = False
-		self._redSlider.setHidden(True)
-		self._greenSlider.setHidden(True)
-		self._blueSlider.setHidden(True)
-		self._colorSquare.setHidden(True)
-		self._thumbnail.setHidden(False)
 
 	def getColor(self):
 		return (self._redSlider.getValue() / 256.0, self._greenSlider.getValue() / 256.0, self._blueSlider.getValue() / 256.0)
 
 	def getMinSize(self):
 		bs = self._base._buttonSize
-		if self._selecting:
-			return glColorPicker.width*bs, glColorPicker.selectingHeight*bs
-		return glColorPicker.width*bs, glColorPicker.displayHeight*bs
+		return glColorPicker.width*bs, glColorPicker.height*bs
 
 	def draw(self):
 		super(glColorPicker, self).draw()
@@ -1282,16 +1252,11 @@ class glColorPicker(glGuiContainer):
 			glVertex2f(  x  ,y + h)
 			glEnd()
 
-	def OnMouseUp(self, x, y):
-		found = super(glColorPicker, self).OnMouseUp(x, y)
-		if not found and self._selecting:
-			self.exitSelecting()
-		return found
-
 class glRangeSelect(glGuiControl):
-	def __init__(self, parent, pos, minValue, maxValue, initColor, callback):
-		self._colors = [initColor]
-		self._layers = [maxValue]
+	width = 0.2
+	height = 4
+
+	def __init__(self, parent, pos, minValue, maxValue, callback):
 		self._callback = callback
 		self._focus = False
 		self._hidden = False
@@ -1325,43 +1290,11 @@ class glRangeSelect(glGuiControl):
 	def setHidden(self, value):
 		self._hidden = value
 
-	def setColor(self, layer, color):
-		if layer > self._maxValue:
-			return
-		index, exists = self.findLayerIndex(layer)
-		if not exists:
-			self._addColor(layer, index, color)
-		else:
-			self._colors[index] = color
-		self._callback()
-
-	def _addColor(self, layer, index, color):
-		self._layers.insert(index, layer)
-		self._colors.insert(index, color)
-
-	def findLayerIndex(self, layer):
-		layers = self._layers
-		lower = 0
-		upper = len(layers)
-		pos = (upper + lower) // 2 # integer division
-		while upper > lower:
-			if layers[pos] == layer:
-				return pos, True
-			elif layers[pos] > layer:
-				upper = pos
-			else:
-				lower = pos + 1
-			pos = (upper + lower) // 2
-		return pos, False
-
-	def getLayers(self):
-		return self._layers
-
-	def getColors(self):
-		return self._colors
-
 	def getMinSize(self):
-		return self._base._buttonSize * 0.2, self._base._buttonSize * 4
+		bs = self._base._buttonSize
+		w = glRangeSelect.width
+		h = glRangeSelect.height
+		return  bs * w, bs * h
 
 	def _getPixelPos(self):
 		x0, y0, w, h = self.getSize()
@@ -1431,21 +1364,13 @@ class glRangeSelect(glGuiControl):
 
 	def _drawBackground(self, w, h):
 		alpha = self._getBackgroundAlpha()
-		glPushMatrix()
-		glTranslatef(-w/2, h/2, 0)
+		glColor4f(.25,.25,.25,alpha)
 		glBegin(GL_QUADS)
-		lastLayerHeight = 0
-		for n in xrange(len(self._layers)):
-			layerHeight = h*self.getNormalizedValue(self._layers[n])
-			color = self._colors[n]
-			glColor4f(color[0], color[1], color[2], alpha)
-			glVertex2f(w, -layerHeight)
-			glVertex2f(0, -layerHeight)
-			glVertex2f(0, -lastLayerHeight)
-			glVertex2f(w, -lastLayerHeight)
-			lastLayerHeight = layerHeight
+		glVertex2f( w/2,-h/2)
+		glVertex2f(-w/2,-h/2)
+		glVertex2f(-w/2, h/2)
+		glVertex2f( w/2, h/2)
 		glEnd()
-		glPopMatrix()
 
 	def getNormalizedValue(self, value):
 		valueRange = self._maxValue - self._minValue
@@ -1497,3 +1422,82 @@ class glRangeSelect(glGuiControl):
 			self._base._focus = None
 			return True
 		return False
+
+class glColorRangeSelect(glRangeSelect):
+	width = glRangeSelect.width
+	height = glRangeSelect.height
+
+	def __init__(self, parent, pos, minValue, maxValue, initColor, callback):
+		self._colors = [initColor]
+		self._layers = [maxValue]
+		super(glColorRangeSelect, self).__init__(parent, pos, minValue, maxValue, callback)
+
+	def getLayers(self):
+		return self._layers
+
+	def getColors(self):
+		return self._colors
+
+	def setColor(self, color):
+		if not self.hasSelected():
+			return;
+
+		minLayer = self.getMinSelect()
+		maxLayer = self.getMaxSelect()
+		minIndex, minExists = self.findLayerIndex(minLayer-1)
+		if not minExists: # duplicate the lower color to preserve it
+			self._addColor(minLayer-1, minIndex, self._colors[minIndex])
+
+		maxIndex, maxExists = self.findLayerIndex(maxLayer-1)
+		self._clearRange(minIndex+1, maxIndex)
+		maxIndex = minIndex + 1
+
+		if not maxExists:
+			self._addColor(maxLayer-1, maxIndex, color)
+		else:
+			self._colors[maxIndex] = color
+		self._callback()
+
+	def _addColor(self, layer, index, color):
+		self._layers.insert(index, layer)
+		self._colors.insert(index, color)
+
+	def _clearRange(self, minIndex, maxIndex):
+		del self._layers[minIndex:maxIndex]
+		del self._colors[minIndex:maxIndex]
+
+	def findLayerIndex(self, layer):
+		layers = self._layers
+		lower = 0
+		upper = len(layers)
+		pos = (upper + lower) // 2 # integer division
+		while upper > lower:
+			if layers[pos] == layer:
+				return pos, True
+			elif layers[pos] > layer:
+				upper = pos
+			else:
+				lower = pos + 1
+			pos = (upper + lower) // 2
+		return pos, False
+
+	def _drawBackground(self, w, h):
+		alpha = self._getBackgroundAlpha()
+		glPushMatrix()
+		glTranslatef(-w/2, h/2, 0)
+		glBegin(GL_QUADS)
+		lastLayerHeight = 0
+		for n in xrange(len(self._layers)):
+			layerHeight = h*self.getNormalizedValue(self._layers[n])
+			color = self._colors[n]
+			glColor4f(color[0], color[1], color[2], alpha)
+			glVertex2f(w, -layerHeight)
+			glVertex2f(0, -layerHeight)
+			glVertex2f(0, -lastLayerHeight)
+			glVertex2f(w, -lastLayerHeight)
+			lastLayerHeight = layerHeight
+		glEnd()
+		glPopMatrix()
+
+#class glLayerPainter(glGuiContainer):
+
