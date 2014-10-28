@@ -1027,16 +1027,16 @@ class glSlider(glGuiControl):
 		minSize = self.getMinSize()
 		return x0 + w / 2 - minSize[0] / 2, y0 + h / 2 - minSize[1] / 2
 
-	def setBackgroundColor(self):
+	def _setBackgroundColor(self):
 		if self.hasFocus():
 			glColor4ub(60,60,60,255)
 		else:
 			glColor4ub(60,60,60,192)
 
-	def setTextColor(self):
+	def _setTextColor(self):
 		glColor4ub(0,0,0,255)
 
-	def setNubColor(self):
+	def _setNubColor(self):
 		glColor4ub(255,255,255,240)
 
 	def draw(self):
@@ -1049,7 +1049,7 @@ class glSlider(glGuiControl):
 		glPushMatrix()
 		glTranslatef(pos[0], pos[1], 0)
 		glDisable(GL_TEXTURE_2D)
-		self.setBackgroundColor()
+		self._setBackgroundColor()
 		glBegin(GL_QUADS)
 		glVertex2f( w/2,-h/2)
 		glVertex2f(-w/2,-h/2)
@@ -1057,13 +1057,10 @@ class glSlider(glGuiControl):
 		glVertex2f( w/2, h/2)
 		glEnd()
 		scrollLength = h - w
-		if self._maxValue-self._minValue != 0:
-			valueNormalized = ((self.getValue()-self._minValue)/(self._maxValue-self._minValue))
-		else:
-			valueNormalized = 0
+		valueNormalized = self.getNormalizedValue(self.getValue())
 		glTranslate(0.0,scrollLength/2,0)
 		if True:  # self._focus:
-			self.setTextColor()
+			self._setTextColor()
 			glPushMatrix()
 			glTranslate(-w/2,openglHelpers.glGetStringSize(str(self._minValue))[1]/2,0)
 			openglHelpers.glDrawStringRight(str(self._minValue))
@@ -1072,7 +1069,7 @@ class glSlider(glGuiControl):
 			glTranslate(w,scrollLength-scrollLength*valueNormalized,0)
 			openglHelpers.glDrawStringLeft(str(self.getValue()))
 			glPopMatrix()
-		self.setNubColor()
+		self._setNubColor()
 		glTranslate(0.0,-scrollLength*valueNormalized,0)
 		glBegin(GL_QUADS)
 		glVertex2f( w/2,-w/2)
@@ -1081,6 +1078,14 @@ class glSlider(glGuiControl):
 		glVertex2f( w/2, w/2)
 		glEnd()
 		glPopMatrix()
+
+	def getNormalizedValue(self, value):
+		valueRange = self._maxValue - self._minValue
+		if valueRange != 0:
+			valueNormalized = (value-self._minValue)/valueRange
+		else:
+			valueNormalized = 0
+		return valueNormalized
 
 	def _checkHit(self, x, y):
 		if self._hidden:
@@ -1128,7 +1133,7 @@ class glColorSlider(glSlider):
 		super(glColorSlider, self).__init__(parent, value, 0, 256, pos, callback)
 		self._color = color
 
-	def setBackgroundColor(self):
+	def _setBackgroundColor(self):
 		value = self.getValue()
 		r = (self._color[0] * value) >> 8
 		g = (self._color[1] * value) >> 8
@@ -1138,10 +1143,10 @@ class glColorSlider(glSlider):
 		else:
 			glColor4ub(r,g,b,192)
 
-	def setTextColor(self):
+	def _setTextColor(self):
 		glColor4ub(0,0,0,0)
 
-	def setNubColor(self):
+	def _setNubColor(self):
 		value = self.getValue()
 		r = ((value + (((256-value) * self._color[0]) >> 8)) * 255) >> 8
 		g = ((value + (((256-value) * self._color[1]) >> 8)) * 255) >> 8
@@ -1282,3 +1287,213 @@ class glColorPicker(glGuiContainer):
 		if not found and self._selecting:
 			self.exitSelecting()
 		return found
+
+class glRangeSelect(glGuiControl):
+	def __init__(self, parent, pos, minValue, maxValue, initColor, callback):
+		self._colors = [initColor]
+		self._layers = [maxValue]
+		self._callback = callback
+		self._focus = False
+		self._hidden = False
+		self._baseSelect = minValue
+		self._endSelect = minValue
+		self._minValue = minValue
+		self._maxValue = maxValue
+		super(glRangeSelect, self).__init__(parent, pos)
+
+	def setRange(self, minValue, maxValue):
+		if maxValue < minValue:
+			maxValue = minValue
+		self._minValue = minValue
+		self._maxValue = maxValue
+
+	def getMinValue(self):
+		return self._minValue
+
+	def getMaxValue(self):
+		return self._maxValue
+
+	def getMinSelect(self):
+		return min(self._baseSelect, self._endSelect)
+
+	def getMaxSelect(self):
+		return max(self._baseSelect, self._endSelect)
+
+	def hasSelected(self):
+		return self._baseSelect != self._endSelect
+
+	def setHidden(self, value):
+		self._hidden = value
+
+	def setColor(self, layer, color):
+		if layer > self._maxValue:
+			return
+		index, exists = self.findLayerIndex(layer)
+		if not exists:
+			self._addColor(layer, index, color)
+		else:
+			self._colors[index] = color
+		self._callback()
+
+	def _addColor(self, layer, index, color):
+		self._layers.insert(index, layer)
+		self._colors.insert(index, color)
+
+	def findLayerIndex(self, layer):
+		layers = self._layers
+		lower = 0
+		upper = len(layers)
+		pos = (upper + lower) // 2 # integer division
+		while upper > lower:
+			if layers[pos] == layer:
+				return pos, True
+			elif layers[pos] > layer:
+				upper = pos
+			else:
+				lower = pos + 1
+			pos = (upper + lower) // 2
+		return pos, False
+
+	def getLayers(self):
+		return self._layers
+
+	def getColors(self):
+		return self._colors
+
+	def getMinSize(self):
+		return self._base._buttonSize * 0.2, self._base._buttonSize * 4
+
+	def _getPixelPos(self):
+		x0, y0, w, h = self.getSize()
+		minSize = self.getMinSize()
+		return x0 + w / 2 - minSize[0] / 2, y0 + h / 2 - minSize[1] / 2
+
+	def _getBackgroundAlpha(self):
+		if self.hasFocus():
+			return 1
+		else:
+			return 0.75
+
+	def _setTextColor(self):
+		glColor4ub(0,0,0,255)
+
+	def _setOverlayColor(self):
+		glColor4ub(0,0,0,128)
+
+	def draw(self):
+		if self._hidden:
+			return
+
+		w, h = self.getMinSize()
+		pos = self._getPixelPos()
+
+		glPushMatrix()
+		glTranslatef(pos[0], pos[1], 0)
+		glDisable(GL_TEXTURE_2D)
+		self._drawBackground(w, h)
+		minSelect = self.getMinSelect()
+		maxSelect = self.getMaxSelect()
+		maxHeight = h*self.getNormalizedValue(maxSelect)
+		minHeight = h*self.getNormalizedValue(minSelect)
+		if True:  # self._focus:
+			scrollLength = h - w
+			self._setTextColor()
+			glPushMatrix()
+			glTranslate(0.0,scrollLength/2,0)
+
+			glTranslate(-w/2,openglHelpers.glGetStringSize(str(self._minValue))[1]/2,0)
+			openglHelpers.glDrawStringRight(str(self._minValue))
+
+			if self.hasSelected():
+				glPushMatrix()
+				glTranslate(w,-minHeight,0)
+				openglHelpers.glDrawStringLeft(str(minSelect))
+				glPopMatrix()
+				glPushMatrix()
+				glTranslate(w,-maxHeight,0)
+				openglHelpers.glDrawStringLeft(str(maxSelect))
+				glPopMatrix()
+
+			glTranslate(0,-scrollLength,0)
+			openglHelpers.glDrawStringRight(str(self._maxValue))
+
+			glPopMatrix()
+		if self.hasSelected():
+			self._setOverlayColor()
+			glTranslatef(-w/2, -h/2, 0)
+			glBegin(GL_QUADS)
+			glVertex2f(w, h-maxHeight)
+			glVertex2f(0, h-maxHeight)
+			glVertex2f(0, h-minHeight)
+			glVertex2f(w, h-minHeight)
+			glEnd()
+		glPopMatrix()
+
+	def _drawBackground(self, w, h):
+		alpha = self._getBackgroundAlpha()
+		glPushMatrix()
+		glTranslatef(-w/2, h/2, 0)
+		glBegin(GL_QUADS)
+		lastLayerHeight = 0
+		for n in xrange(len(self._layers)):
+			layerHeight = h*self.getNormalizedValue(self._layers[n])
+			color = self._colors[n]
+			glColor4f(color[0], color[1], color[2], alpha)
+			glVertex2f(w, -layerHeight)
+			glVertex2f(0, -layerHeight)
+			glVertex2f(0, -lastLayerHeight)
+			glVertex2f(w, -lastLayerHeight)
+			lastLayerHeight = layerHeight
+		glEnd()
+		glPopMatrix()
+
+	def getNormalizedValue(self, value):
+		valueRange = self._maxValue - self._minValue
+		if valueRange != 0:
+			valueNormalized = (value-self._minValue)/valueRange
+		else:
+			valueNormalized = 0
+		return valueNormalized
+
+	def _checkHit(self, x, y):
+		if self._hidden:
+			return False
+		pos = self._getPixelPos()
+		w, h = self.getMinSize()
+		return -w/2 <= x - pos[0] <= w/2 and -h/2 <= y - pos[1] <= h/2
+
+	def setFocus(self):
+		self._base._focus = self
+		return True
+
+	def OnMouseMotion(self, x, y):
+		if self.hasFocus():
+			self._handleMotion(y)
+			self._callback()
+			return True
+		if self._checkHit(x, y):
+			self._focus = True
+			return True
+		self._focus = False
+		return False
+
+	def _handleMotion(self, y):
+		w, h = self.getMinSize()
+		pos = self._getPixelPos()
+		newValue = int(self._minValue + (self._maxValue - self._minValue) * -(y - pos[1] - h/2) / h)
+		self._endSelect = max(self._minValue, min(newValue, self._maxValue))
+
+	def OnMouseDown(self, x, y, button):
+		if self._checkHit(x, y):
+			self.setFocus()
+			self._handleMotion(y)
+			self._baseSelect = self._endSelect
+			self._callback()
+			return True
+		return False
+
+	def OnMouseUp(self, x, y):
+		if self.hasFocus():
+			self._base._focus = None
+			return True
+		return False
