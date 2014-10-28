@@ -101,9 +101,12 @@ class SceneView(openglGui.glGuiPanel):
 		openglGui.glLabel(self.scaleForm, _("Uniform scale"), (0,8))
 		self.scaleUniform = openglGui.glCheckbox(self.scaleForm, True, (1,8), None)
 
-		self.viewSelection = openglGui.glComboButton(self, _("View mode"), [7,19,11,15,23], [_("Normal"), _("Overhang"), _("Transparent"), _("X-Ray"), _("Layers")], (-1,0), self.OnViewChange)
+		self.viewSelection = openglGui.glComboButton(self, _("View mode"), [7,19,11,15,23,23], [_("Normal"), _("Overhang"), _("Transparent"), _("X-Ray"), _("Layers"), _("Colors")], (-1,0), self.OnViewChange)
 
-		self.colorPicker = openglGui.glColorPicker(self, (2, 2), (256, 256, 0), lambda: self.updateColor())
+		self.layerColors = openglGui.glRangeSelect(self, (-1.5, -3), 0, 1950, (0,1,1), lambda: self.updateColor())
+		self.layerColors.setColor(564, (1,0.5,0))
+		self.layerColors.setColor(491, (1,0,0))
+		self.layerColors.setColor(708, (0,0,1))
 
 		self.youMagineButton = openglGui.glButton(self, 26, _("Share on YouMagine"), (2,0), lambda button: youmagineGui.youmagineManager(self.GetTopLevelParent(), self._scene))
 		self.youMagineButton.setDisabled(True)
@@ -121,11 +124,13 @@ class SceneView(openglGui.glGuiPanel):
 		self.OnToolSelect(0)
 		self.updateToolButtons()
 		self.updateProfileToControls()
+		self.updateColor()
 
 	def updateColor(self):
-		color = self.colorPicker.getColor()
-		for i in xrange(0, 3):
-			self._objColors[0][i] = color[i]
+		self._minSelectedLayer = self.layerColors.getMinSelect()
+		self._maxSelectedLayer = self.layerColors.getMaxSelect()
+		self._colorLayers = self.layerColors.getLayers()
+		self._colorColors = self.layerColors.getColors()
 
 	def loadGCodeFile(self, filename):
 		self.OnDeleteAll(None)
@@ -402,6 +407,8 @@ class SceneView(openglGui.glGuiPanel):
 			self.viewMode = 'transparent'
 		elif self.viewSelection.getValue() == 3:
 			self.viewMode = 'xray'
+		elif self.viewSelection.getValue() == 5:
+			self.viewMode = 'layerColors'
 		else:
 			self.viewMode = 'normal'
 		self._engineResultView.setEnabled(self.viewMode == 'gcode')
@@ -934,6 +941,65 @@ class SceneView(openglGui.glGuiPanel):
 				self._animZoom = None
 		if self._objectShader is None: #TODO: add loading shaders from file(s)
 			if openglHelpers.hasShaderSupport():
+				self._layerShader = openglHelpers.GLShader("""
+					uniform mat4 model_matrix;
+
+					varying float light_amount;
+					varying vec3 vertex_position;
+
+					void main(void)
+					{
+						gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
+						gl_FrontColor = gl_Color;
+
+						vertex_position = vec3(model_matrix * gl_Vertex);
+						//gl_Position = gl_ProjectionMatrix * (model_matrix * gl_Vertex);
+
+						light_amount = abs(dot(normalize(gl_NormalMatrix * gl_Normal), normalize(gl_LightSource[0].position.xyz)));
+						light_amount += 0.2;
+					}
+				""","""
+					uniform int min_selected;
+					uniform int max_selected;
+					uniform int num_layers;
+					uniform int layer_starts[64];
+					uniform vec4 layer_colors[64];
+					uniform float layer_height;
+
+					varying float light_amount;
+					varying vec3 vertex_position;
+
+					vec4 getDistanceColor(void)
+					{
+						return vec4(vec3(1.0 - smoothstep(0, 100, length(vertex_position))), 1);
+					}
+
+					vec4 getLayerColor(int layer)
+					{
+						// binary search for closest preceding layer start, and return the associated color
+						if (layer < 0) return getDistanceColor();
+						int lowerbound = 0;
+						int upperbound = num_layers;
+						int position = (lowerbound + upperbound) / 2;
+						while((layer_starts[position] != layer) && (lowerbound < upperbound))
+						{
+							if (layer_starts[position] > layer)
+								upperbound = position;
+							else
+								lowerbound = position + 1;
+							position = (lowerbound + upperbound) / 2;
+						}
+						return layer_colors[position];
+					}
+
+					void main(void)
+					{
+						int layer = int(vertex_position.z / layer_height);
+						float selectDim = (layer >= min_selected && layer < max_selected) ? 0.5 : 1.0;
+						vec4 color = getLayerColor(layer);
+						gl_FragColor = vec4(color.rgb * (selectDim * light_amount), color.a);
+					}
+				""")
 				self._objectShader = openglHelpers.GLShader("""
 					varying float light_amount;
 
@@ -945,7 +1011,7 @@ class SceneView(openglGui.glGuiPanel):
 						light_amount = abs(dot(normalize(gl_NormalMatrix * gl_Normal), normalize(gl_LightSource[0].position.xyz)));
 						light_amount += 0.2;
 					}
-									""","""
+				""","""
 					varying float light_amount;
 
 					void main(void)
@@ -999,18 +1065,19 @@ class SceneView(openglGui.glGuiPanel):
 						light_amount = abs(dot(normalize(gl_NormalMatrix * gl_Normal), normalize(gl_LightSource[0].position.xyz)));
 						light_amount += 0.2;
 					}
-			""","""
-				uniform float intensity;
-				varying float light_amount;
+				""","""
+					uniform float intensity;
+					varying float light_amount;
 
-				void main(void)
-				{
-					gl_FragColor = vec4(gl_Color.xyz * light_amount, 1.0-intensity);
-				}
+					void main(void)
+					{
+						gl_FragColor = vec4(gl_Color.xyz * light_amount, 1.0-intensity);
+					}
 				""")
 			if self._objectShader is None or not self._objectShader.isValid(): #Could not make shader.
 				self._objectShader = openglHelpers.GLFakeShader()
 				self._objectOverhangShader = openglHelpers.GLFakeShader()
+				self._layerShader = openglHelpers.GLFakeShader()
 				self._objectLoadShader = None
 		self._init3DView()
 		glTranslate(0,0,-self._zoom)
@@ -1058,6 +1125,14 @@ class SceneView(openglGui.glGuiPanel):
 			if self.viewMode == 'overhang':
 				self._objectOverhangShader.bind()
 				self._objectOverhangShader.setUniform('cosAngle', math.cos(math.radians(90 - profile.getProfileSettingFloat('support_angle'))))
+			elif self.viewMode == 'layerColors':
+				self._layerShader.bind()
+				self._layerShader.setUniform('num_layers', len(self._colorLayers))
+				self._layerShader.setUniform('min_selected', self._minSelectedLayer)
+				self._layerShader.setUniform('max_selected', self._maxSelectedLayer)
+				self._layerShader.setUniformIntArray('layer_starts', self._colorLayers)
+				self._layerShader.setUniformVec4Array('layer_colors', list((color[0], color[1], color[2], 1) for color in self._colorColors))
+				self._layerShader.setUniform('layer_height', 0.1)
 			else:
 				self._objectShader.bind()
 			for obj in self._scene.objects():
@@ -1091,6 +1166,12 @@ class SceneView(openglGui.glGuiPanel):
 						self._objectOverhangShader.setUniform('rotMatrix', obj.getMatrix() * self.tempMatrix)
 					else:
 						self._objectOverhangShader.setUniform('rotMatrix', obj.getMatrix())
+				elif self.viewMode == 'layerColors':
+					pos = obj.getPosition()
+					height = -profile.getProfileSettingFloat('object_sink')
+					offset = obj.getDrawOffset()
+					modelMatrix = openglHelpers.convert3x3MatrixTo4x4(obj.getMatrix(), [-offset[0]+pos[0], -offset[1]+pos[1], -offset[2]+height])
+					self._layerShader.setUniformMat4('model_matrix', modelMatrix)
 
 				if not self._scene.checkPlatform(obj):
 					glColor4f(0.5 * brightness, 0.5 * brightness, 0.5 * brightness, 0.8 * brightness)
@@ -1211,6 +1292,14 @@ class SceneView(openglGui.glGuiPanel):
 			glTranslate(0,-4,-10)
 			glColor4ub(60,60,60,255)
 			openglHelpers.glDrawStringCenter(_("Overhang view not working due to lack of OpenGL shaders support."))
+			glPopMatrix()
+		elif self.viewMode == 'layerColors' and not openglHelpers.hasShaderSupport():
+			glDisable(GL_DEPTH_TEST)
+			glPushMatrix()
+			glLoadIdentity()
+			glTranslate(0,-4,-10)
+			glColor4ub(60,60,60,255)
+			openglHelpers.glDrawStringCenter(_("Colors view not working due to lack of OpenGL shaders support."))
 			glPopMatrix()
 
 	def _renderObject(self, obj, brightness = 0, addSink = True):
