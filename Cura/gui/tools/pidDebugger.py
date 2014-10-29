@@ -10,7 +10,7 @@ class debuggerWindow(wx.Frame):
 		super(debuggerWindow, self).__init__(parent, title='Cura - PID Debugger')
 
 		self.machineCom = None
-		self.machineCom = machineCom.MachineCom(callbackObject=self)
+		self.machineCom = machineCom.PrinterCom(callbackObject=self)
 		self.coolButton = wx.Button(self, -1, '0C')
 		self.heatupButton = wx.Button(self, -1, '200C')
 		self.heatupButton2 = wx.Button(self, -1, '260C')

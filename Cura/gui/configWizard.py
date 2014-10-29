@@ -652,7 +652,7 @@ class UltimakerCheckupPage(InfoPage):
 		self.stopState.SetBitmap(self.unknownBitmap)
 		self.checkupState = 0
 		self.checkExtruderNr = 0
-		self.comm = machineCom.MachineCom(callbackObject=self)
+		self.comm = machineCom.PrinterCom(callbackObject=self)
 
 	def OnErrorLog(self, e):
 		printWindow.LogWindow('\n'.join(self.comm.getLog()))
@@ -892,7 +892,7 @@ class UltimakerCalibrateStepsPerEPage(InfoPage):
 		self.heatButton.Enable(False)
 		self.extrudeButton.Enable(False)
 		currentEValue = float(self.stepsPerEInput.GetValue())
-		self.comm = machineCom.MachineCom()
+		self.comm = machineCom.PrinterCom()
 		if not self.comm.isOpen():
 			wx.MessageBox(
 				_("Error: Failed to open serial port to machine\nIf this keeps happening, try disconnecting and reconnecting the USB cable"),
@@ -926,7 +926,7 @@ class UltimakerCalibrateStepsPerEPage(InfoPage):
 	def OnHeatRun(self):
 		self.heatButton.Enable(False)
 		self.extrudeButton.Enable(False)
-		self.comm = machineCom.MachineCom()
+		self.comm = machineCom.PrinterCom()
 		if not self.comm.isOpen():
 			wx.MessageBox(
 				_("Error: Failed to open serial port to machine\nIf this keeps happening, try disconnecting and reconnecting the USB cable"),
@@ -1074,7 +1074,7 @@ class bedLevelWizardMain(InfoPage):
 			wx.CallAfter(self.OnConnect)
 			return
 		self.connectButton.Enable(False)
-		self.comm = machineCom.MachineCom(callbackObject=self)
+		self.comm = machineCom.PrinterCom(callbackObject=self)
 		self.infoBox.SetBusy(_('Connecting to machine.'))
 		self._wizardState = 0
 
@@ -1293,7 +1293,7 @@ class headOffsetCalibrationPage(InfoPage):
 			wx.CallAfter(self.OnConnect)
 			return
 		self.connectButton.Enable(False)
-		self.comm = machineCom.MachineCom(callbackObject=self)
+		self.comm = machineCom.PrinterCom(callbackObject=self)
 		self.infoBox.SetBusy(_('Connecting to machine.'))
 		self._wizardState = 0
 

@@ -27,7 +27,7 @@ class serialComm(object):
 			baudrate = int(baudrate)
 		except ValueError:
 			baudrate = 0
-		self._comm = machineCom.MachineCom(portName, baudrate, callbackObject=self)
+		self._comm = machineCom.PrinterCom(portName, baudrate, callbackObject=self)
 
 	def mcLog(self, message):
 		sys.stdout.write('log:%s\n' % (message))

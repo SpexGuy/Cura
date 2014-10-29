@@ -187,20 +187,10 @@ class MachineCom(object):
 		self._serialDetectList = []
 		self._baudrateDetectList = baudrateList()
 		self._baudrateDetectRetry = 0
-		self._extruderCount = int(profile.getMachineSetting('extruder_amount'))
-		self._temperatureRequestExtruder = 0
-		self._temp = [0] * self._extruderCount
-		self._targetTemp = [0] * self._extruderCount
-		self._bedTemp = 0
-		self._bedTargetTemp = 0
 		self._gcodeList = None
 		self._gcodePos = 0
 		self._commandQueue = queue.Queue()
 		self._logQueue = queue.Queue(256)
-		self._feedRateModifier = {}
-		self._currentZ = -1
-		self._heatupWaitStartTime = 0
-		self._heatupWaitTimeLost = 0.0
 		self._printStartTime100 = None
 		
 		self.thread = threading.Thread(target=self._monitor)
@@ -283,12 +273,6 @@ class MachineCom(object):
 		printTimeLeft = printTimeTotal - printTime
 		return printTimeLeft
 	
-	def getTemp(self):
-		return self._temp
-	
-	def getBedTemp(self):
-		return self._bedTemp
-	
 	def getLog(self):
 		ret = []
 		while not self._logQueue.empty():
@@ -298,6 +282,11 @@ class MachineCom(object):
 		return ret
 	
 	def _monitor(self):
+		self._openSerialPort()
+		self._monitorSerialPort()
+		self._log("Connection closed, closing down monitor")
+
+	def _openSerialPort(self):
 		#Open the serial port.
 		if self._port == 'AUTO':
 			self._changeState(self.STATE_DETECT_SERIAL)
@@ -332,6 +321,7 @@ class MachineCom(object):
 					self._serial = serial.Serial(str(self._port), self._baudrate, timeout=5, writeTimeout=10000)
 			except:
 				self._log("Unexpected error while connecting to serial port: %s %s" % (self._port, getExceptionString()))
+		#find baudrate
 		if self._serial is None:
 			baudrate = self._baudrate
 			if baudrate == 0:
@@ -354,7 +344,7 @@ class MachineCom(object):
 			else:
 				self._changeState(self.STATE_CONNECTING)
 
-		#Start monitoring the serial port.
+	def _monitorSerialPort(self):
 		if self._state == self.STATE_CONNECTING:
 			timeout = time.time() + 15
 		else:
@@ -379,23 +369,9 @@ class MachineCom(object):
 					if not self.isError():
 						self._errorValue = line[6:]
 						self._changeState(self.STATE_ERROR)
-			if ' T:' in line or line.startswith('T:'):
-				try:
-					self._temp[self._temperatureRequestExtruder] = float(re.search("T: *([0-9\.]*)", line).group(1))
-				except:
-					pass
-				if 'B:' in line:
-					try:
-						self._bedTemp = float(re.search("B: *([0-9\.]*)", line).group(1))
-					except:
-						pass
-				self._callback.mcTempUpdate(self._temp, self._bedTemp, self._targetTemp, self._bedTargetTemp)
-				#If we are waiting for an M109 or M190 then measure the time we lost during heatup, so we can remove that time from our printing time estimate.
-				if not 'ok' in line and self._heatupWaitStartTime != 0:
-					t = time.time()
-					self._heatupWaitTimeLost = t - self._heatupWaitStartTime
-					self._heatupWaitStartTime = t
-			elif line.strip() != '' and line.strip() != 'ok' and not line.startswith('Resend:') and not line.startswith('Error:checksum mismatch') and not line.startswith('Error:Line Number is not Last Line Number+1') and line != 'echo:Unknown command:""\n' and self.isOperational():
+			if self._handleMessage(line):
+				pass
+			elif self._shouldEcho(line):
 				self._callback.mcMessage(line)
 
 			if self._state == self.STATE_DETECT_BAUDRATE or self._state == self.STATE_DETECT_SERIAL:
@@ -408,13 +384,13 @@ class MachineCom(object):
 						self._baudrateDetectRetry -= 1
 						self._serial.write('\n')
 						self._log("Baudrate test retry: %d" % (self._baudrateDetectRetry))
-						self._sendCommand("M105")
+						self._sendBaudrateTest()
 						self._testingBaudrate = True
 					else:
 						if self._state == self.STATE_DETECT_SERIAL:
 							if len(self._serialDetectList) == 0:
 								if len(self._baudrateDetectList) == 0:
-									self._log("Tried all serial ports and baudrates, but still not printer found that responds to M105.")
+									self._log("Tried all serial ports and baudrates, but still not printer found that responds to baudrate test command.")
 									self._errorValue = 'Failed to autodetect serial port.'
 									self._changeState(self.STATE_ERROR)
 									return
@@ -433,17 +409,17 @@ class MachineCom(object):
 							self._baudrateDetectTestOk = 0
 							timeout = time.time() + 5
 							self._serial.write('\n')
-							self._sendCommand("M105")
+							self._sendBaudrateTest()
 							self._testingBaudrate = True
 						except:
 							self._log("Unexpected error while setting baudrate: %d %s" % (baudrate, getExceptionString()))
-				elif 'T:' in line:
+				elif self._checkBaudrateSuccess(line):
 					self._baudrateDetectTestOk += 1
 					if self._baudrateDetectTestOk < 10:
 						self._log("Baudrate test ok: %d" % (self._baudrateDetectTestOk))
-						self._sendCommand("M105")
+						self._sendBaudrateTest()
 					else:
-						self._sendCommand("M999")
+						self._sendCommand(self._resetCommand)
 						self._serial.timeout = 2
 						profile.putMachineSetting('serial_baud_auto', self._serial.baudrate)
 						self._changeState(self.STATE_OPERATIONAL)
@@ -451,29 +427,15 @@ class MachineCom(object):
 					self._testingBaudrate = False
 			elif self._state == self.STATE_CONNECTING:
 				if line == '' or 'wait' in line:        # 'wait' needed for Repetier (kind of watchdog)
-					self._sendCommand("M105")
-				elif 'ok' in line:
+					self._sendConnectTest()
+				elif self._checkConnectSuccess(line):
 					self._changeState(self.STATE_OPERATIONAL)
 				if time.time() > timeout:
 					self.close()
 			elif self._state == self.STATE_OPERATIONAL:
-				#Request the temperature on comm timeout (every 2 seconds) when we are not printing.
-				if line == '':
-					if self._extruderCount > 0:
-						self._temperatureRequestExtruder = (self._temperatureRequestExtruder + 1) % self._extruderCount
-						self.sendCommand("M105 T%d" % (self._temperatureRequestExtruder))
-					else:
-						self.sendCommand("M105")
-					tempRequestTimeout = time.time() + 5
+				self._onMessageIdle(line)
 			elif self._state == self.STATE_PRINTING:
-				#Even when printing request the temperature every 5 seconds.
-				if time.time() > tempRequestTimeout:
-					if self._extruderCount > 0:
-						self._temperatureRequestExtruder = (self._temperatureRequestExtruder + 1) % self._extruderCount
-						self.sendCommand("M105 T%d" % (self._temperatureRequestExtruder))
-					else:
-						self.sendCommand("M105")
-					tempRequestTimeout = time.time() + 5
+				self._onMessagePrinting(line)
 				if line == '' and time.time() > timeout:
 					self._log("Communication timeout during printing, forcing a line")
 					line = 'ok'
@@ -489,7 +451,30 @@ class MachineCom(object):
 					except:
 						if "rs" in line:
 							self._gcodePos = int(line.split()[1])
-		self._log("Connection closed, closing down monitor")
+
+	def _sendBaudrateTest(self):
+		self._sendCommand("M105")
+
+	def _checkBaudrateSuccess(self, line):
+		return 'T' in line
+
+	def _sendConnectTest(self):
+		self._sendCommand("M105")
+
+	def _checkConnectSuccess(self):
+		return 'ok' in line
+
+	def _sendReset(self):
+		self._sendCommand("M999")
+
+	def _onMessageIdle(self, line):
+		pass
+
+	def _handleMessage(self, line):
+		return False
+
+	def _shouldEcho(self, line):
+		return line.strip() != '' and line.strip() != 'ok' and not line.startswith('Resend:') and not line.startswith('Error:checksum mismatch') and not line.startswith('Error:Line Number is not Last Line Number+1') and line != 'echo:Unknown command:""\n' and self.isOperational()
 
 	def _setBaudrate(self, baudrate):
 		try:
@@ -540,21 +525,7 @@ class MachineCom(object):
 	def _sendCommand(self, cmd):
 		if self._serial is None:
 			return
-		if 'M109' in cmd or 'M190' in cmd:
-			self._heatupWaitStartTime = time.time()
-		if 'M104' in cmd or 'M109' in cmd:
-			try:
-				t = 0
-				if 'T' in cmd:
-					t = int(re.search('T([0-9]+)', cmd).group(1))
-				self._targetTemp[t] = float(re.search('S([0-9]+)', cmd).group(1))
-			except:
-				pass
-		if 'M140' in cmd or 'M190' in cmd:
-			try:
-				self._bedTargetTemp = float(re.search('S([0-9]+)', cmd).group(1))
-			except:
-				pass
+		cmd = self._preprocessCommand(cmd)
 		self._log('Send: %s' % (cmd))
 		try:
 			self._serial.write(cmd + '\n')
@@ -572,6 +543,9 @@ class MachineCom(object):
 			self._errorValue = getExceptionString()
 			self.close(True)
 	
+	def _preprocessCommand(self, command):
+		return command
+
 	def _sendNext(self):
 		if self._gcodePos >= len(self._gcodeList):
 			self._changeState(self.STATE_OPERATIONAL)
@@ -579,6 +553,91 @@ class MachineCom(object):
 		if self._gcodePos == 100:
 			self._printStartTime100 = time.time()
 		line = self._gcodeList[self._gcodePos]
+		line = self._preprocessNext(line)
+		checksum = reduce(lambda x,y:x^y, map(ord, "N%d%s" % (self._gcodePos, line)))
+		self._sendCommand("N%d%s*%d" % (self._gcodePos, line, checksum))
+		self._gcodePos += 1
+		self._callback.mcProgress(self._gcodePos)
+	
+	def _preprocessNext(self, command):
+		return command
+
+	def sendCommand(self, cmd):
+		cmd = cmd.encode('ascii', 'replace')
+		if self.isPrinting():
+			self._commandQueue.put(cmd)
+		elif self.isOperational():
+			self._sendCommand(cmd)
+	
+	def printGCode(self, gcodeList):
+		if not self.isOperational() or self.isPrinting():
+			return
+		self._gcodeList = gcodeList
+		self._gcodePos = 0
+		self._printStartTime100 = None
+		self._changeState(self.STATE_PRINTING)
+		self._onPrintStart()
+		self._printStartTime = time.time()
+		for i in xrange(0, 4):
+			self._sendNext()
+	
+	def _onPrintStart(self):
+		pass
+
+	def cancelPrint(self):
+		if self.isOperational():
+			self._changeState(self.STATE_OPERATIONAL)
+	
+	def setPause(self, pause):
+		if not pause and self.isPaused():
+			self._changeState(self.STATE_PRINTING)
+			for i in xrange(0, 6):
+				self._sendNext()
+		if pause and self.isPrinting():
+			self._changeState(self.STATE_PAUSED)
+
+class PrinterCom(MachineCom):
+	def __init__(self, port = None, baudrate = None, callbackObject = None):
+		super(PrinterCom, self).__init__("M105", port, baudrate, callbackObject)
+		self._extruderCount = int(profile.getMachineSetting('extruder_amount'))
+		self._temperatureRequestExtruder = 0
+		self._temp = [0] * self._extruderCount
+		self._targetTemp = [0] * self._extruderCount
+		self._bedTemp = 0
+		self._bedTargetTemp = 0
+		self._feedRateModifier = {}
+		self._currentZ = -1
+		self._heatupWaitStartTime = 0
+		self._heatupWaitTimeLost = 0.0
+
+	def getTemp(self):
+		return self._temp
+	
+	def getBedTemp(self):
+		return self._bedTemp
+
+	def _onPrintStart(self):
+		self._printSection = 'CUSTOM'
+
+	def _preprocessCommand(self, cmd):
+		if 'M109' in cmd or 'M190' in cmd:
+			self._heatupWaitStartTime = time.time()
+		if 'M104' in cmd or 'M109' in cmd:
+			try:
+				t = 0
+				if 'T' in cmd:
+					t = int(re.search('T([0-9]+)', cmd).group(1))
+				self._targetTemp[t] = float(re.search('S([0-9]+)', cmd).group(1))
+			except:
+				pass
+		if 'M140' in cmd or 'M190' in cmd:
+			try:
+				self._bedTargetTemp = float(re.search('S([0-9]+)', cmd).group(1))
+			except:
+				pass
+		return cmd
+
+	def _preprocessNext(self, line):
 		if type(line) is tuple:
 			self._printSection = line[1]
 			line = line[0]
@@ -595,42 +654,46 @@ class MachineCom(object):
 					self._callback.mcZChange(z)
 		except:
 			self._log("Unexpected error: %s" % (getExceptionString()))
-		checksum = reduce(lambda x,y:x^y, map(ord, "N%d%s" % (self._gcodePos, line)))
-		self._sendCommand("N%d%s*%d" % (self._gcodePos, line, checksum))
-		self._gcodePos += 1
-		self._callback.mcProgress(self._gcodePos)
-	
-	def sendCommand(self, cmd):
-		cmd = cmd.encode('ascii', 'replace')
-		if self.isPrinting():
-			self._commandQueue.put(cmd)
-		elif self.isOperational():
-			self._sendCommand(cmd)
-	
-	def printGCode(self, gcodeList):
-		if not self.isOperational() or self.isPrinting():
-			return
-		self._gcodeList = gcodeList
-		self._gcodePos = 0
-		self._printStartTime100 = None
-		self._printSection = 'CUSTOM'
-		self._changeState(self.STATE_PRINTING)
-		self._printStartTime = time.time()
-		for i in xrange(0, 4):
-			self._sendNext()
-	
-	def cancelPrint(self):
-		if self.isOperational():
-			self._changeState(self.STATE_OPERATIONAL)
-	
-	def setPause(self, pause):
-		if not pause and self.isPaused():
-			self._changeState(self.STATE_PRINTING)
-			for i in xrange(0, 6):
-				self._sendNext()
-		if pause and self.isPrinting():
-			self._changeState(self.STATE_PAUSED)
-	
+		return line
+
+	def _handleMessage(self, line):
+		if ' T:' in line or line.startswith('T:'):
+			try:
+				self._temp[self._temperatureRequestExtruder] = float(re.search("T: *([0-9\.]*)", line).group(1))
+			except:
+				pass
+			if 'B:' in line:
+				try:
+					self._bedTemp = float(re.search("B: *([0-9\.]*)", line).group(1))
+				except:
+					pass
+			self._callback.mcTempUpdate(self._temp, self._bedTemp, self._targetTemp, self._bedTargetTemp)
+			#If we are waiting for an M109 or M190 then measure the time we lost during heatup, so we can remove that time from our printing time estimate.
+			if not 'ok' in line and self._heatupWaitStartTime != 0:
+				t = time.time()
+				self._heatupWaitTimeLost = t - self._heatupWaitStartTime
+				self._heatupWaitStartTime = t
+			return True
+		return False
+
+	def _onMessageIdle(self, line):
+		#Request the temperature on comm timeout (every 2 seconds) when we are not printing.
+		if line == '':
+			self._doTemperatureCheck()
+
+	def _onMessagePrinting(self, line):
+		#Even when printing request the temperature every 5 seconds.
+		if time.time() > self._tempRequestTimeout:
+			self._doTemperatureCheck()
+
+	def _doTemperatureCheck(self):
+		if self._extruderCount > 0:
+			self._temperatureRequestExtruder = (self._temperatureRequestExtruder + 1) % self._extruderCount
+			self.sendCommand("M105 T%d" % (self._temperatureRequestExtruder))
+		else:
+			self.sendCommand("M105")
+		self._tempRequestTimeout = time.time() + 5
+
 	def setFeedrateModifier(self, type, value):
 		self._feedRateModifier[type] = value
 
