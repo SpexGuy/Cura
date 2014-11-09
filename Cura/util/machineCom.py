@@ -598,7 +598,7 @@ class MachineCom(object):
 
 class PrinterCom(MachineCom):
 	def __init__(self, port = None, baudrate = None, callbackObject = None):
-		super(PrinterCom, self).__init__("M105", port, baudrate, callbackObject)
+		super(PrinterCom, self).__init__(port, baudrate, callbackObject)
 		self._extruderCount = int(profile.getMachineSetting('extruder_amount'))
 		self._temperatureRequestExtruder = 0
 		self._temp = [0] * self._extruderCount
