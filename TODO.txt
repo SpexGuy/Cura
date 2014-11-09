@@ -1,0 +1,3 @@
+profile.getValueIndex(self)?
+
+profile.checkAndUpdateMachineName()?

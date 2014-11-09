@@ -168,14 +168,7 @@ class MachineCom(object):
 	STATE_ERROR = 9
 	STATE_CLOSED_WITH_ERROR = 10
 	
-	def __init__(self, port = None, baudrate = None, callbackObject = None):
-		if port is None:
-			port = profile.getMachineSetting('serial_port')
-		if baudrate is None:
-			if profile.getMachineSetting('serial_baud') == 'AUTO':
-				baudrate = 0
-			else:
-				baudrate = int(profile.getMachineSetting('serial_baud'))
+	def __init__(self, port, baudrate, callbackObject = None):
 		if callbackObject is None:
 			callbackObject = MachineComPrintCallback()
 
@@ -598,6 +591,13 @@ class MachineCom(object):
 
 class PrinterCom(MachineCom):
 	def __init__(self, port = None, baudrate = None, callbackObject = None):
+		if port is None:
+			port = profile.getMachineSetting('serial_port')
+		if baudrate is None:
+			if profile.getMachineSetting('serial_baud') == 'AUTO':
+				baudrate = 0
+			else:
+				baudrate = int(profile.getMachineSetting('serial_baud'))
 		super(PrinterCom, self).__init__(port, baudrate, callbackObject)
 		self._extruderCount = int(profile.getMachineSetting('extruder_amount'))
 		self._temperatureRequestExtruder = 0
@@ -700,6 +700,13 @@ class PrinterCom(MachineCom):
 
 class ColorCom(MachineCom):
 	def __init__(self, port = None, baudrate = None, callbackObject = None):
+		if port is None:
+			port = profile.getColorSetting('color_serial_port')
+		if baudrate is None:
+			if profile.getColorSetting('color_serial_baud') == 'AUTO':
+				baudrate = 0
+			else:
+				baudrate = int(profile.getColorSetting('color_serial_baud'))
 		super(PrinterCom, self).__init__(port, baudrate, callbackObject)
 
 	def _sendBaudrateTest(self):

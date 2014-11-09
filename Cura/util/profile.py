@@ -37,6 +37,7 @@ settingsList = []
 #Currently selected machine (by index) Cura support multiple machines in the same preferences and can switch between them.
 # Each machine has it's own index and unique name.
 _selectedMachineIndex = 0
+_selectedColorDeviceIndex = 0
 
 class setting(object):
 	"""
@@ -101,6 +102,9 @@ class setting(object):
 
 	def isMachineSetting(self):
 		return self._category == 'machine'
+
+	def isColorSetting(self):
+		return self._category == 'color'
 
 	def isAlteration(self):
 		return self._category == 'alteration'
@@ -477,6 +481,7 @@ setting('youmagine_token', '', str, 'preference', 'hidden')
 setting('filament_physical_density', '1240', float, 'preference', 'hidden').setRange(500.0, 3000.0).setLabel(_("Density (kg/m3)"), _("Weight of the filament per m3. Around 1240 for PLA. And around 1040 for ABS. This value is used to estimate the weight if the filament used for the print."))
 setting('language', 'English', str, 'preference', 'hidden').setLabel(_('Language'), _('Change the language in which Cura runs. Switching language requires a restart of Cura'))
 setting('active_machine', '0', int, 'preference', 'hidden')
+setting('active_color_device', '0', int, 'preference', 'hidden')
 
 setting('model_colour', '#FFC924', str, 'preference', 'hidden').setLabel(_('Model colour'), _('Display color for first extruder'))
 setting('model_colour2', '#CB3030', str, 'preference', 'hidden').setLabel(_('Model colour (2)'), _('Display color for second extruder'))
@@ -520,6 +525,13 @@ setting('extruder_head_size_min_y', '0.0', float, 'machine', 'hidden').setLabel(
 setting('extruder_head_size_max_x', '0.0', float, 'machine', 'hidden').setLabel(_("Head size towards X max (mm)"), _("The head size when printing multiple objects, measured from the tip of the nozzle towards the outer part of the head. 18mm for an Ultimaker if the fan is on the left side."))
 setting('extruder_head_size_max_y', '0.0', float, 'machine', 'hidden').setLabel(_("Head size towards Y max (mm)"), _("The head size when printing multiple objects, measured from the tip of the nozzle towards the outer part of the head. 35mm for an Ultimaker if the fan is on the left side."))
 setting('extruder_head_size_height', '0.0', float, 'machine', 'hidden').setLabel(_("Printer gantry height (mm)"), _("The height of the gantry holding up the printer head. If an object is higher then this then you cannot print multiple objects one for one. 60mm for an Ultimaker."))
+
+setting('color_device_name', '', str, 'color', 'hidden')
+setting('color_serial_port', 'AUTO', str, 'color', 'hidden'),setLabel(_("Serial port"), _("Serial port to use for communication with the color device."))
+setting('color_serial_port_auto', '', str, 'color', 'hidden')
+setting('color_serial_baud', 'AUTO', str, 'color', 'hidden').setLabel(_("Baudrate"), _("Speed of the serial port communication\nNeeds to match your device"))
+setting('color_serial_baud_auto', '', int, 'color', 'hidden')
+setting('color_printer_delay', '0', float, 'color', 'hidden').setLabel(_("Printer Delay in mm"), _("The filament distance between the color device and the extruder head"))
 
 validators.warningAbove(settingsDictionary['filament_flow'], 150, _("More flow than 150% is rare and usually not recommended."))
 validators.warningBelow(settingsDictionary['filament_flow'], 50, _("Less flow than 50% is rare and usually not recommended."))
@@ -886,6 +898,7 @@ def loadPreferences(filename):
 		n += 1
 
 	setActiveMachine(int(getPreferenceFloat('active_machine')))
+	setActiveColorDevice(int(getPreferenceFloat('active_color_device')))
 
 def loadMachineSettings(filename):
 	global settingsList
@@ -900,6 +913,9 @@ def loadMachineSettings(filename):
 		if set.isMachineSetting():
 			if profileParser.has_option('machine', set.getName()):
 				set.setValue(unicode(profileParser.get('machine', set.getName()), 'utf-8', 'replace'))
+		elif set.isColorSetting():
+			if profileParser.has_option('color', set.getName()):
+				set.setValue(unicode(profileParser.get('color', set.getName()), 'utf-8', 'replace'))
 	checkAndUpdateMachineName()
 
 def savePreferences(filename):
@@ -918,6 +934,14 @@ def savePreferences(filename):
 		for set in settingsList:
 			if set.isMachineSetting():
 				parser.set('machine_%d' % (n), set.getName(), set.getValue(n).encode('utf-8'))
+		n += 1
+
+	n = 0
+	while getColorSetting('color_device_name', n) != '':
+		parser.add_section('color_%d' % (n))
+		for set in settingsList:
+			if set.isColorSetting():
+				parser.set('color_%d' % (n), set.getName(), set.getValue(n).encode('utf-8'))
 		n += 1
 	try:
 		parser.write(open(filename, 'w'))
@@ -1025,6 +1049,62 @@ def removeMachine(index):
 
 	if _selectedMachineIndex >= index:
 		setActiveMachine(getMachineCount() - 1)
+
+def getColorSettingFloat(name, index = None):
+	try:
+		setting = getColorSetting(name, index).replace(',', '.')
+		return float(eval(setting, {}, {}))
+	except:
+		return 0.0
+
+def getColorSetting(name, index = None):
+	if name in tempOverride:
+		return tempOverride[name]
+	global settingsDictionary
+	if name in settingsDictionary and settingsDictionary[name].isColorSetting():
+		return settingsDictionary[name].getValue(index)
+	traceback.print_stack()
+	sys.stderr.write('Error: "%s" not found in color settings\n' % (name))
+	return ''
+
+def putColorSetting(name, value, index = None):
+	#Check if we have a configuration file loaded, else load the default.
+	global settingsDictionary
+	if name in settingsDictionary and settingsDictionary[name].isColorSetting():
+		settingsDictionary[name].setValue(value, index)
+	savePreferences(getPreferencePath())
+
+def isColorSetting(name):
+	global settingsDictionary
+	if name in settingsDictionary and settingsDictionary[name].isColorSetting():
+		return True
+	return False
+
+def getColorDeviceCount():
+	n = 0
+	while getColorSetting('color_device_name', n) != '':
+		n += 1
+	if n < 1:
+		return 1
+	return n
+
+def setActiveColorDevice(index):
+	global _selectedColorDeviceIndex
+	_selectedColorDeviceIndex = index
+	putPreference('active_color_device', _selectedColorDeviceIndex)
+
+def removeColorDevice(index):
+	global _selectedColorDeviceIndex
+	global settingsList
+	if getMachineCount() < 2:
+		return
+	for n in xrange(index, getColorDeviceCount()):
+		for setting in settingsList:
+			if setting.isColorSetting():
+				setting.setValue(setting.getValue(n+1), n)
+
+	if _selectedColorDeviceIndex >= index:
+		setActiveColorDevice(getColorDeviceCount() - 1)
 
 ## Temp overrides for multi-extruder slicing and the project planner.
 tempOverride = {}
