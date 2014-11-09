@@ -107,6 +107,8 @@ class machineSettingsDialog(wx.Dialog):
 			configBase.TitleRow(right, _("Communication settings"))
 			configBase.SettingRow(right, 'serial_port', ['AUTO'] + machineCom.serialList(), index=idx)
 			configBase.SettingRow(right, 'serial_baud', ['AUTO'] + map(str, machineCom.baudrateList()), index=idx)
+			configBase.SettingRow(right, 'color_serial_port', ['AUTO'] + machineCom.serialList(), index=idx)
+			configBase.SettingRow(right, 'color_serial_baud', ['AUTO'] + map(str, machineCom.baudrateList()), index=idx)
 
 			self.nb.AddPage(main, profile.getMachineSetting('machine_name', idx).title())
 
