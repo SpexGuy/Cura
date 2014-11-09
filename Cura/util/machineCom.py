@@ -697,6 +697,27 @@ class PrinterCom(MachineCom):
 	def setFeedrateModifier(self, type, value):
 		self._feedRateModifier[type] = value
 
+
+class ColorCom(MachineCom):
+	def __init__(self, port = None, baudrate = None, callbackObject = None):
+		super(PrinterCom, self).__init__(port, baudrate, callbackObject)
+
+	def _sendBaudrateTest(self):
+		self._sendCommand("C100")
+
+	def _checkBaudrateSuccess(self, line):
+		return 'color' in line
+
+	def _sendConnectTest(self):
+		self._sendCommand("C100")
+
+	def _checkConnectSuccess(self):
+		return 'color' in line
+
+	def _sendReset(self):
+		self._sendCommand("M999")
+
+
 def getExceptionString():
 	locationInfo = traceback.extract_tb(sys.exc_info()[2])[0]
 	return "%s: '%s' @ %s:%s:%d" % (str(sys.exc_info()[0].__name__), str(sys.exc_info()[1]), os.path.basename(locationInfo[0]), locationInfo[2], locationInfo[1])
