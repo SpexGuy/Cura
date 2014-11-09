@@ -419,7 +419,7 @@ class MachineCom(object):
 						self._log("Baudrate test ok: %d" % (self._baudrateDetectTestOk))
 						self._sendBaudrateTest()
 					else:
-						self._sendCommand(self._resetCommand)
+						self._sendReset()
 						self._serial.timeout = 2
 						profile.putMachineSetting('serial_baud_auto', self._serial.baudrate)
 						self._changeState(self.STATE_OPERATIONAL)
