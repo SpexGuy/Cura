@@ -34,8 +34,8 @@ def main():
 
 	if options.serialCommunication:
 		from Cura import serialCommunication
-		port, baud = options.serialCommunication.split(':')
-		serialCommunication.startMonitor(port, baud)
+		port, baud, printer = options.serialCommunication.split(':')
+		serialCommunication.startMonitor(port, baud, printer)
 		return
 
 	print "load preferences from " + profile.getPreferencePath()

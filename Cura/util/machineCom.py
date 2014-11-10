@@ -72,13 +72,32 @@ def baudrateList():
 			ret.insert(0, prev)
 	return ret
 
-class VirtualPrinter():
+class VirtualMachine(object):
+	def __init__(self, readList):
+		self.readList = readList
+
+	def write(self, data):
+		if self.readList is None:
+			return
+		print "Send: %s" % (data.rstrip())
+
+	def readline(self):
+		if self.readList is None:
+			return ''
+		if len(self.readList) > 0:
+			return self.readList.pop(0)
+		return ''
+
+	def close(self):
+		self.readList = None
+
+class VirtualPrinter(VirtualMachine):
 	"""
 	A virtual printer class used for debugging. Acts as a serial.Serial class, but without connecting to any port.
 	Only available when running the development version of Cura.
 	"""
 	def __init__(self):
-		self.readList = ['start\n', 'Marlin: Virtual Marlin!\n', '\x80\n']
+		super(VirtualPrinter, self).__init__(['start\n', 'Marlin: Virtual Marlin!\n', '\x80\n'])
 		self.temp = 0.0
 		self.targetTemp = 0.0
 		self.lastTempAt = time.time()
@@ -127,6 +146,18 @@ class VirtualPrinter():
 	
 	def close(self):
 		self.readList = None
+
+class VirtualColorDevice(VirtualMachine):
+	def __init__(self):
+		super(VirtualColorDevice, self).__init__([])
+
+	def write(self, data):
+		if self.readList is None:
+			return
+		if 'C100' in data and 'G' not in data:
+			self.readList.append("color:virtual:1.0.0")
+		elif len(data.strip()) > 0:
+			self.readList.append("ok\n")
 
 class MachineComPrintCallback(object):
 	"""
@@ -279,6 +310,9 @@ class MachineCom(object):
 		self._monitorSerialPort()
 		self._log("Connection closed, closing down monitor")
 
+	def _makeVirtualMachine(self):
+		return VirtualMachine()
+
 	def _openSerialPort(self):
 		#Open the serial port.
 		if self._port == 'AUTO':
@@ -302,7 +336,7 @@ class MachineCom(object):
 				self._serialDetectList = serialList(True)
 		elif self._port == 'VIRTUAL':
 			self._changeState(self.STATE_OPEN_SERIAL)
-			self._serial = VirtualPrinter()
+			self._serial = self._makeVirtualMachine()
 		else:
 			self._changeState(self.STATE_OPEN_SERIAL)
 			try:
@@ -454,13 +488,16 @@ class MachineCom(object):
 	def _sendConnectTest(self):
 		self._sendCommand("M105")
 
-	def _checkConnectSuccess(self):
+	def _checkConnectSuccess(self, line):
 		return 'ok' in line
 
 	def _sendReset(self):
 		self._sendCommand("M999")
 
 	def _onMessageIdle(self, line):
+		pass
+
+	def _onMessagePrinting(self, line):
 		pass
 
 	def _handleMessage(self, line):
@@ -610,6 +647,9 @@ class PrinterCom(MachineCom):
 		self._heatupWaitStartTime = 0
 		self._heatupWaitTimeLost = 0.0
 
+	def _makeVirtualMachine(self):
+		return VirtualPrinter()
+
 	def getTemp(self):
 		return self._temp
 	
@@ -707,7 +747,10 @@ class ColorCom(MachineCom):
 				baudrate = 0
 			else:
 				baudrate = int(profile.getMachineSetting('serial_baud'))
-		super(PrinterCom, self).__init__(port, baudrate, callbackObject)
+		super(ColorCom, self).__init__(port, baudrate, callbackObject)
+
+	def _makeVirtualMachine(self):
+		return VirtualColorDevice()
 
 	def _sendBaudrateTest(self):
 		self._sendCommand("C100")
@@ -718,7 +761,7 @@ class ColorCom(MachineCom):
 	def _sendConnectTest(self):
 		self._sendCommand("C100")
 
-	def _checkConnectSuccess(self):
+	def _checkConnectSuccess(self, line):
 		return 'color' in line
 
 	def _sendReset(self):

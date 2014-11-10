@@ -19,7 +19,7 @@ class serialComm(object):
 	The serialComm class is the interface class which handles the communication between stdin/stdout and the machineCom class.
 	This interface class is used to run the (USB) serial communication in a different process then the GUI.
 	"""
-	def __init__(self, portName, baudrate):
+	def __init__(self, portName, baudrate, com):
 		self._comm = None
 		self._gcodeList = []
 
@@ -27,7 +27,7 @@ class serialComm(object):
 			baudrate = int(baudrate)
 		except ValueError:
 			baudrate = 0
-		self._comm = machineCom.PrinterCom(portName, baudrate, callbackObject=self)
+		self._comm = com(portName, baudrate, callbackObject=self)
 
 	def mcLog(self, message):
 		sys.stdout.write('log:%s\n' % (message))
@@ -65,16 +65,19 @@ class serialComm(object):
 			else:
 				sys.stderr.write(str(line))
 
-def startMonitor(portName, baudrate):
+def startMonitor(portName, baudrate, printer='printer'):
 	sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
-	comm = serialComm(portName, baudrate)
+	com = machineCom.PrinterCom
+	if printer == 'color':
+		com = machineCom.ColorCom
+	comm = serialComm(portName, baudrate, com)
 	comm.monitorStdin()
 
 def main():
-	if len(sys.argv) != 3:
+	if len(sys.argv) != 4:
 		return
-	portName, baudrate = sys.argv[1], sys.argv[2]
-	startMonitor(portName, baudrate)
+	portName, baudrate, printer = sys.argv[1], sys.argv[2], sys.argv[3]
+	startMonitor(portName, baudrate, printer)
 
 if __name__ == '__main__':
 	main()
