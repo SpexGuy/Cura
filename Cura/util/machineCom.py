@@ -376,7 +376,7 @@ class MachineCom(object):
 			timeout = time.time() + 15
 		else:
 			timeout = time.time() + 5
-		tempRequestTimeout = timeout
+		self._baudrateDetectTestOk = 0
 		while True:
 			line = self._readline()
 			if line is None:
