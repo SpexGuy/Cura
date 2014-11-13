@@ -417,10 +417,10 @@ class SceneView(openglGui.glGuiPanel):
 			y = (maxColor-color[2])/maxColor
 			k = 1-maxColor
 			# Round values for boolean markers
-			c = c > 0.5 ? 255 : 0
-			m = m > 0.5 ? 255 : 0
-			y = y > 0.5 ? 255 : 0
-			k = k > 0.5 ? 255 : 0
+			c = 255 if c > 0.5 else 0
+			m = 255 if m > 0.5 else 0
+			y = 255 if y > 0.5 else 0
+			k = 255 if k > 0.5 else 0
 			# Find the start and end layer
 			layer = self._colorLayers[n]
 			# Truncate to max layer
