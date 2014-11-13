@@ -64,6 +64,8 @@ class SceneView(openglGui.glGuiPanel):
 		self.openFileButton      = openglGui.glButton(self, 4, _("Load"), (0,0), self.showLoadModel)
 		self.printButton         = openglGui.glButton(self, 6, _("Print"), (1,0), self.OnPrintButton)
 		self.printButton.setDisabled(True)
+		self.printFilamentButton = openglGui.glButton(self, 6, _("Print Filament"), (2,0), self.OnPrintFilamentButton)
+		self.printFilamentButton.setDisabled(True)
 
 		group = []
 		self.rotateToolButton = openglGui.glRadioButton(self, 8, _("Rotate"), (0,-1), group, self.OnToolSelect)
@@ -106,7 +108,7 @@ class SceneView(openglGui.glGuiPanel):
 		self.layerColors = openglGui.glColorRangeSelect(self, (-1.5, -3), 0, 1950, (0,1,1), lambda: self.updateColor())
 		self.layerColorer = openglGui.glColorPicker(self, (-2, -5.4), (0,1,1), lambda: self.layerColors.setColor(self.layerColorer.getColor()))
 
-		self.youMagineButton = openglGui.glButton(self, 26, _("Share on YouMagine"), (2,0), lambda button: youmagineGui.youmagineManager(self.GetTopLevelParent(), self._scene))
+		self.youMagineButton = openglGui.glButton(self, 26, _("Share on YouMagine"), (3,0), lambda button: youmagineGui.youmagineManager(self.GetTopLevelParent(), self._scene))
 		self.youMagineButton.setDisabled(True)
 
 		self.notification = openglGui.glNotification(self, (0, 0))
@@ -141,6 +143,7 @@ class SceneView(openglGui.glGuiPanel):
 		self.printButton.setBottomText('')
 		self.viewSelection.setValue(4)
 		self.printButton.setDisabled(False)
+		self.printFilamentButton.setDisabled(False)
 		self.youMagineButton.setDisabled(True)
 		self.OnViewChange()
 
@@ -248,6 +251,35 @@ class SceneView(openglGui.glGuiPanel):
 		dlg.Destroy()
 		meshLoader.saveMeshes(filename, self._scene.objects())
 
+	def OnPrintFilamentButton(self, button):
+		if button == 1:
+			connectionGroup = self._printerConnectionManager.getAvailableGroup()
+			if connectionGroup is not None:
+				connections = connectionGroup.getAvailableConnections()
+				if len(connections) < 2:
+					connection = connections[0]
+				else:
+					dlg = wx.SingleChoiceDialog(self, "Select the %s connection to use" % (connectionGroup.getName()), "Multiple %s connections found" % (connectionGroup.getName()), map(lambda n: n.getName(), connections))
+					if dlg.ShowModal() != wx.ID_OK:
+						dlg.Destroy()
+						return
+					connection = connections[dlg.GetSelection()]
+					dlg.Destroy()
+				self._openPrintWindowForConnection(connection, self._getColorGCode())
+			else:
+				self.showSaveColorGCode(self._getColorGCode())
+		if button == 3:
+			menu = wx.Menu()
+			connections = self._printerConnectionManager.getAvailableConnections()
+			menu.connectionMap = {}
+			for connection in connections:
+				i = menu.Append(-1, _("Print with %s") % (connection.getName()))
+				menu.connectionMap[i.GetId()] = connection
+				self.Bind(wx.EVT_MENU, lambda e: self._openPrintWindowForConnection(e.GetEventObject().connectionMap[e.GetId()]), i)
+			self.Bind(wx.EVT_MENU, lambda e: self.showSaveColorGCode(), menu.Append(-1, _("Save GCode...")))
+			self.PopupMenu(menu)
+			menu.Destroy()
+
 	def OnPrintButton(self, button):
 		if button == 1:
 			connectionGroup = self._printerConnectionManager.getAvailableGroup()
@@ -263,7 +295,7 @@ class SceneView(openglGui.glGuiPanel):
 				else:
 					drive = drives[0]
 				filename = self._scene._objectList[0].getName() + profile.getGCodeExtension()
-				threading.Thread(target=self._saveGCode,args=(drive[1] + filename, drive[1])).start()
+				threading.Thread(target=self._saveGCode,args=(drive[1] + filename, self._engine.getResult().getGCode(), drive[1])).start()
 			elif connectionGroup is not None:
 				connections = connectionGroup.getAvailableConnections()
 				if len(connections) < 2:
@@ -275,7 +307,7 @@ class SceneView(openglGui.glGuiPanel):
 						return
 					connection = connections[dlg.GetSelection()]
 					dlg.Destroy()
-				self._openPrintWindowForConnection(connection)
+				self._openPrintWindowForConnection(connection, self._engine.getResult().getGCode())
 			else:
 				self.showSaveGCode()
 		if button == 3:
@@ -291,7 +323,7 @@ class SceneView(openglGui.glGuiPanel):
 			self.PopupMenu(menu)
 			menu.Destroy()
 
-	def _openPrintWindowForConnection(self, connection):
+	def _openPrintWindowForConnection(self, connection, gcode):
 		if connection.window is None or not connection.window:
 			connection.window = None
 			windowType = profile.getPreference('printing_window')
@@ -303,7 +335,7 @@ class SceneView(openglGui.glGuiPanel):
 				connection.window = printWindow.printWindowBasic(self, connection)
 		connection.window.Show()
 		connection.window.Raise()
-		if not connection.loadGCodeData(self._engine.getResult().getGCode()):
+		if not connection.loadGCodeData(gcode):
 			if connection.isPrinting():
 				self.notification.message("Cannot start print, because other print still running.")
 			else:
@@ -322,10 +354,24 @@ class SceneView(openglGui.glGuiPanel):
 		filename = dlg.GetPath()
 		dlg.Destroy()
 
-		threading.Thread(target=self._saveGCode,args=(filename,)).start()
+		threading.Thread(target=self._saveGCode,args=(filename,self._engine.getResult().getGCode(),)).start()
 
-	def _saveGCode(self, targetFilename, ejectDrive = False):
-		gcode = self._engine.getResult().getGCode()
+	def showSaveColorGCode(self):
+		if len(self._scene._objectList) < 1:
+			return
+		dlg=wx.FileDialog(self, _("Save toolpath"), os.path.dirname(profile.getPreference('lastFile')), style=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT)
+		filename = self._scene._objectList[0].getName() + profile.getColorGCodeExtension()
+		dlg.SetFilename(filename)
+		dlg.SetWildcard('Toolpath (*%s)|*%s;*%s' % (profile.getColorGCodeExtension(), profile.getColorGCodeExtension(), profile.getColorGCodeExtension()[0:2]))
+		if dlg.ShowModal() != wx.ID_OK:
+			dlg.Destroy()
+			return
+		filename = dlg.GetPath()
+		dlg.Destroy()
+
+		threading.Thread(target=self._saveGCode,args=(filename,self._getColorGCode())).start()
+
+	def _saveGCode(self, targetFilename, gcode, ejectDrive = False):
 		try:
 			size = float(len(gcode))
 			read_pos = 0
@@ -351,6 +397,48 @@ class SceneView(openglGui.glGuiPanel):
 				self.notification.message("Saved as %s" % (targetFilename))
 		self.printButton.setProgressBar(None)
 		self._engine.getResult().submitInfoOnline()
+
+	def _getColorGCode(self):
+		result = self._engine.getResult()
+		layers = result.getLayers()
+		if not layers:
+			return None
+		colorCode = ['G100'] # start the print with a flush
+		numLayers = len(layers)
+		#self._colorLayers
+		#self._colorColors
+		lastLayer = 0
+		for n in xrange(len(self._colorLayers)):
+			# Calculate GCode params for color
+			color = self._colorColors[n]
+			maxColor = max(color)
+			c = (maxColor-color[0])/maxColor
+			m = (maxColor-color[1])/maxColor
+			y = (maxColor-color[2])/maxColor
+			k = 1-maxColor
+			# Round values for boolean markers
+			c = c > 0.5 ? 255 : 0
+			m = m > 0.5 ? 255 : 0
+			y = y > 0.5 ? 255 : 0
+			k = k > 0.5 ? 255 : 0
+			# Find the start and end layer
+			layer = self._colorLayers[n]
+			# Truncate to max layer
+			truncated = layer > numLayers
+			if truncated:
+				layer = numLayers
+			# Total the filament length
+			e = sum(layers[lastLayer:layer], key=lambda lyr: lyr['extrusion'].sum())
+			# Add the instruction
+			colorCode.append("G1 C%d M%d Y%d K%d E%d" % (c, m, y, k, e))
+			lastLayer = layer
+			# Done if truncated
+			if truncated:
+				break
+
+		colorCode.append('G100') # end the print with a flush
+		return colorCode
+
 
 	def _doEjectSD(self, drive):
 		if removableStorage.ejectDrive(drive):
@@ -574,6 +662,7 @@ class SceneView(openglGui.glGuiPanel):
 			if self.printButton.getProgressBar() is not None and progressValue >= 0.0 and abs(self.printButton.getProgressBar() - progressValue) < 0.01:
 				return
 		self.printButton.setDisabled(not finished)
+		self.printFilamentButton.setDisabled(not finished)
 		if progressValue >= 0.0:
 			self.printButton.setProgressBar(progressValue)
 		else:
