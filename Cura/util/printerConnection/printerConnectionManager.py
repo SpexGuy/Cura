@@ -43,3 +43,28 @@ class PrinterConnectionManager(object):
 		for e in self._groupList:
 			ret += e.getAvailableConnections()
 		return ret
+
+class ColorConnectionManager(object):
+
+	def __init__(self):
+		self._groupList = []
+		if version.isDevVersion():
+			self._groupList.append(dummyConnection.dummyConnectionGroup())
+		self._groupList.append(serialConnection.spectromConnectionGroup())
+
+		#Sort the connections by highest priority first.
+		self._groupList.sort(reverse=True)
+
+	#Return the highest priority available connection.
+	def getAvailableGroup(self):
+		for g in self._groupList:
+			if len(g.getAvailableConnections()) > 0:
+				return g
+		return None
+
+	#Return all available connections.
+	def getAvailableConnections(self):
+		ret = []
+		for e in self._groupList:
+			ret += e.getAvailableConnections()
+		return ret
