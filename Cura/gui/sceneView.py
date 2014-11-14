@@ -24,6 +24,7 @@ from Cura.util import sliceEngine
 from Cura.util import pluginInfo
 from Cura.util import removableStorage
 from Cura.util import explorer
+from Cura.util import bigDataStorage
 from Cura.util.printerConnection import printerConnectionManager
 from Cura.gui.util import previewTools
 from Cura.gui.util import openglHelpers
@@ -55,6 +56,7 @@ class SceneView(openglGui.glGuiPanel):
 		self._platformTexture = None
 		self._isSimpleMode = True
 		self._printerConnectionManager = printerConnectionManager.PrinterConnectionManager()
+		self._colorConnectionManager = printerConnectionManager.ColorConnectionManager()
 
 		self._viewport = None
 		self._modelMatrix = None
@@ -253,7 +255,7 @@ class SceneView(openglGui.glGuiPanel):
 
 	def OnPrintFilamentButton(self, button):
 		if button == 1:
-			connectionGroup = self._printerConnectionManager.getAvailableGroup()
+			connectionGroup = self._colorConnectionManager.getAvailableGroup()
 			if connectionGroup is not None:
 				connections = connectionGroup.getAvailableConnections()
 				if len(connections) < 2:
@@ -265,12 +267,12 @@ class SceneView(openglGui.glGuiPanel):
 						return
 					connection = connections[dlg.GetSelection()]
 					dlg.Destroy()
-				self._openPrintWindowForConnection(connection, self._getColorGCode())
+				self._openPrintWindowForConnection(connection, self._getColorGCode(lambda a, b: None)) #TODO: Hangs UI Thread
 			else:
-				self.showSaveColorGCode(self._getColorGCode())
+				self.showSaveColorGCode()
 		if button == 3:
 			menu = wx.Menu()
-			connections = self._printerConnectionManager.getAvailableConnections()
+			connections = self._colorConnectionManager.getAvailableConnections()
 			menu.connectionMap = {}
 			for connection in connections:
 				i = menu.Append(-1, _("Print with %s") % (connection.getName()))
@@ -295,7 +297,7 @@ class SceneView(openglGui.glGuiPanel):
 				else:
 					drive = drives[0]
 				filename = self._scene._objectList[0].getName() + profile.getGCodeExtension()
-				threading.Thread(target=self._saveGCode,args=(drive[1] + filename, self._engine.getResult().getGCode(), drive[1])).start()
+				threading.Thread(target=self._saveGCode,args=(drive[1] + filename, drive[1])).start()
 			elif connectionGroup is not None:
 				connections = connectionGroup.getAvailableConnections()
 				if len(connections) < 2:
@@ -354,7 +356,7 @@ class SceneView(openglGui.glGuiPanel):
 		filename = dlg.GetPath()
 		dlg.Destroy()
 
-		threading.Thread(target=self._saveGCode,args=(filename,self._engine.getResult().getGCode(),)).start()
+		threading.Thread(target=self._saveGCode,args=(filename,)).start()
 
 	def showSaveColorGCode(self):
 		if len(self._scene._objectList) < 1:
@@ -369,9 +371,37 @@ class SceneView(openglGui.glGuiPanel):
 		filename = dlg.GetPath()
 		dlg.Destroy()
 
-		threading.Thread(target=self._saveGCode,args=(filename,self._getColorGCode())).start()
+		threading.Thread(target=self._saveColorGCode,args=(filename,)).start()
 
-	def _saveGCode(self, targetFilename, gcode, ejectDrive = False):
+	def _saveColorGCode(self, targetFilename, ejectDrive = False):
+		try:
+			gcode = self._getColorGCode(lambda result, progress: self.printFilamentButton.setProgressBar(progress))
+			size = float(len(gcode))
+			read_pos = 0
+			with open(targetFilename, 'wb') as fdst:
+				while 1:
+					buf = gcode.read(16*1024)
+					if len(buf) < 1:
+						break
+					read_pos += len(buf)
+					fdst.write(buf)
+					self.printFilamentButton.setProgressBar(read_pos / size)
+					self._queueRefresh()
+		except:
+			import sys, traceback
+			traceback.print_exc()
+			self.notification.message("Failed to save")
+		else:
+			if ejectDrive:
+				self.notification.message("Saved as %s" % (targetFilename), lambda : self._doEjectSD(ejectDrive), 31, 'Eject')
+			elif explorer.hasExplorer():
+				self.notification.message("Saved as %s" % (targetFilename), lambda : explorer.openExplorer(targetFilename), 4, 'Open folder')
+			else:
+				self.notification.message("Saved as %s" % (targetFilename))
+		self.printFilamentButton.setProgressBar(None)
+
+	def _saveGCode(self, targetFilename, ejectDrive = False):
+		gcode = self._engine.getResult().getGCode()
 		try:
 			size = float(len(gcode))
 			read_pos = 0
@@ -398,16 +428,14 @@ class SceneView(openglGui.glGuiPanel):
 		self.printButton.setProgressBar(None)
 		self._engine.getResult().submitInfoOnline()
 
-	def _getColorGCode(self):
+	def _getColorGCode(self, progressCallback):
 		result = self._engine.getResult()
-		layers = result.getLayers()
-		if not layers:
-			return None
-		colorCode = ['G100'] # start the print with a flush
+		layers = result.waitForGCodeLayers(progressCallback)
+		colorCode = bigDataStorage.BigDataStorage()
+		colorCode.write('G100\n') # start the print with a flush
 		numLayers = len(layers)
-		#self._colorLayers
-		#self._colorColors
 		lastLayer = 0
+		print self._colorLayers
 		for n in xrange(len(self._colorLayers)):
 			# Calculate GCode params for color
 			color = self._colorColors[n]
@@ -428,15 +456,17 @@ class SceneView(openglGui.glGuiPanel):
 			if truncated:
 				layer = numLayers
 			# Total the filament length
-			e = sum(layers[lastLayer:layer], key=lambda lyr: lyr['extrusion'].sum())
+			e = sum(map(lambda lyr: sum(map(lambda stroke: stroke['extrusion'].sum(), lyr)), layers[lastLayer:layer]))
+			e *= 48.23 # convert to ESteps
 			# Add the instruction
-			colorCode.append("G1 C%d M%d Y%d K%d E%d" % (c, m, y, k, e))
+			colorCode.write("G1 C%d M%d Y%d K%d E%d ;Layers %d to %d\n" % (c, m, y, k, e, lastLayer, layer))
 			lastLayer = layer
 			# Done if truncated
 			if truncated:
 				break
 
-		colorCode.append('G100') # end the print with a flush
+		colorCode.write('G100\n') # end the print with a flush
+		colorCode.seekStart()
 		return colorCode
 
 
@@ -646,6 +676,7 @@ class SceneView(openglGui.glGuiPanel):
 		self._sceneUpdateTimer.Start(500, True)
 		self._engine.abortEngine()
 		self._scene.updateSizeOffsets()
+		self.updateLayerRange()
 		self.QueueRefresh()
 
 	def _onRunEngine(self, e):
@@ -751,6 +782,8 @@ class SceneView(openglGui.glGuiPanel):
 		self._objColors[3] = profile.getPreferenceColour('model_colour4')
 		self._scene.updateMachineDimensions()
 		self.updateModelSettingsToControls()
+		self.updateLayerRange()
+
 
 	def updateModelSettingsToControls(self):
 		if self._selectedObj is not None:
@@ -762,6 +795,16 @@ class SceneView(openglGui.glGuiPanel):
 			self.scaleXmmctrl.setValue(round(size[0], 2))
 			self.scaleYmmctrl.setValue(round(size[1], 2))
 			self.scaleZmmctrl.setValue(round(size[2], 2))
+
+	def updateLayerRange(self):
+		self._layerHeight = profile.getProfileSettingFloat('layer_height')
+		objects = self._scene.objects()
+		if len(objects) > 0:
+			tallestObject = max(objects, key=lambda obj : obj.getSize()[2])
+			numLayers = int(math.ceil(tallestObject.getSize()[2] / self._layerHeight))
+			self.layerColors.setRange(0, max(numLayers, 1))
+		else:
+			self.layerColors.setRange(0, 1)
 
 	def OnKeyChar(self, keyCode):
 		if self._engineResultView.OnKeyChar(keyCode):
@@ -1018,6 +1061,17 @@ class SceneView(openglGui.glGuiPanel):
 			self.printButton._imageID = 3
 			self.printButton._tooltip = _("Save toolpath")
 
+		colorConnectionGroup = self._colorConnectionManager.getAvailableGroup()
+		if len(removableStorage.getPossibleSDcardDrives()) > 0 and (connectionGroup is None or connectionGroup.getPriority() < 0):
+			self.printFilamentButton._imageID = 2
+			self.printFilamentButton._tooltip = _("Toolpath to SD")
+		elif connectionGroup is not None:
+			self.printFilamentButton._imageID = connectionGroup.getIconID()
+			self.printFilamentButton._tooltip = _("Print with %s") % (connectionGroup.getName())
+		else:
+			self.printFilamentButton._imageID = 3
+			self.printFilamentButton._tooltip = _("Save toolpath")
+
 		if self._animView is not None:
 			self._viewTarget = self._animView.getPosition()
 			if self._animView.isDone():
@@ -1219,7 +1273,7 @@ class SceneView(openglGui.glGuiPanel):
 				self._layerShader.setUniform('max_selected', self._maxSelectedLayer)
 				self._layerShader.setUniformIntArray('layer_starts', self._colorLayers)
 				self._layerShader.setUniformVec4Array('layer_colors', list((color[0], color[1], color[2], 1) for color in self._colorColors))
-				self._layerShader.setUniform('layer_height', 0.1)
+				self._layerShader.setUniform('layer_height', self._layerHeight)
 			else:
 				self._objectShader.bind()
 			for obj in self._scene.objects():

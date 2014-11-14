@@ -1432,6 +1432,24 @@ class glColorRangeSelect(glRangeSelect):
 		self._layers = [maxValue]
 		super(glColorRangeSelect, self).__init__(parent, pos, minValue, maxValue, callback)
 
+	def setRange(self, minValue, maxValue):
+		if maxValue < minValue:
+			maxValue = minValue
+		newRange = maxValue - minValue
+		oldRange = self._maxValue - self._minValue
+		obselete = []
+		# scale layers to new domain
+		for n in xrange(len(self._layers)):
+			self._layers[n] = (self._layers[n] - self._minValue) * newRange // oldRange + minValue
+		# remove duplicate layers if the range was decreased
+		for n in reversed(xrange(len(self._layers)-1)):
+			if self._layers[n] == self._layers[n+1]:
+				self._clearRange(n, n+1)
+		# update internal values
+		self._minValue = minValue
+		self._maxValue = maxValue
+
+
 	def getLayers(self):
 		return self._layers
 
@@ -1446,7 +1464,10 @@ class glColorRangeSelect(glRangeSelect):
 		maxLayer = self.getMaxSelect()
 		minIndex, minExists = self.findLayerIndex(minLayer-1)
 		if not minExists: # duplicate the lower color to preserve it
-			self._addColor(minLayer-1, minIndex, self._colors[minIndex])
+			if minLayer == self._minValue:
+				minIndex -= 1 # minIndex is truly 0
+			else:
+				self._addColor(minLayer-1, minIndex, self._colors[minIndex])
 
 		maxIndex, maxExists = self.findLayerIndex(maxLayer-1)
 		self._clearRange(minIndex+1, maxIndex)

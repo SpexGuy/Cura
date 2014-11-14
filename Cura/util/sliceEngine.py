@@ -67,6 +67,7 @@ class EngineResult(object):
 		self._gcodeInterpreter = gcodeInterpreter.gcode()
 		self._gcodeLoadThread = None
 		self._finished = False
+		self._gcodeLoaded = False
 
 	def getFilamentWeight(self, e=0):
 		#Calculates the weight of the filament in kg
@@ -110,6 +111,7 @@ class EngineResult(object):
 		self._gcodeData = BigDataStorage()
 		self._gcodeData.write(gcode)
 		self._replaceInfo = {}
+		self._gcodeLoaded = False
 
 	def addLog(self, line):
 		self._engineLog.append(line)
@@ -131,11 +133,24 @@ class EngineResult(object):
 			return None
 		if self._gcodeInterpreter.layerList is None and self._gcodeLoadThread is None:
 			self._gcodeInterpreter.progressCallback = self._gcodeInterpreterCallback
-			self._gcodeLoadThread = threading.Thread(target=lambda : self._gcodeInterpreter.load(self._gcodeData.clone()))
+			self._gcodeLoadThread = threading.Thread(target=self._interpretGCode)
 			self._gcodeLoadCallback = loadCallback
 			self._gcodeLoadThread.daemon = True
 			self._gcodeLoadThread.start()
 		return self._gcodeInterpreter.layerList
+
+	def waitForGCodeLayers(self, progressCallback):
+		if not self._gcodeLoaded:
+			self.getGCodeLayers(progressCallback)
+			self._gcodeLoadThread.join()
+		return self._gcodeInterpreter.layerList
+
+	def _interpretGCode(self):
+		#TODO: This is not threadsafe, but is used by multiple threads anyway.
+		if self._gcodeLoaded:
+			return
+		self._gcodeInterpreter.load(self._gcodeData.clone())
+		self._gcodeLoaded = True
 
 	def _gcodeInterpreterCallback(self, progress):
 		if len(self._gcodeInterpreter.layerList) % 5 == 0:

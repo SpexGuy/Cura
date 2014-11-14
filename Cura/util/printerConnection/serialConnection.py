@@ -32,7 +32,7 @@ class serialConnectionGroup(printerConnectionBase.printerConnectionGroup):
 			serialList = [profile.getMachineSetting('serial_port')]
 		for port in serialList:
 			if port not in self._connectionMap:
-				self._connectionMap[port] = serialConnection(port)
+				self._connectionMap[port] = serialConnection(port, 'printer')
 		for key in self._connectionMap.keys():
 			if key not in serialList and not self._connectionMap[key].isActiveConnectionOpen():
 				self._connectionMap.pop(key)
@@ -44,6 +44,30 @@ class serialConnectionGroup(printerConnectionBase.printerConnectionGroup):
 	def getPriority(self):
 		return 50
 
+class spectromConnectionGroup(printerConnectionBase.printerConnectionGroup):
+	def __init__(self):
+		super(spectromConnectionGroup, self).__init__("USB")
+		self._connectionMap = {}
+
+	def getAvailableConnections(self):
+		if profile.getMachineSetting('color_serial_port') == 'AUTO':
+			serialList = machineCom.serialList(True)
+		else:
+			serialList = [profile.getMachineSetting('color_serial_port')]
+		for port in serialList:
+			if port not in self._connectionMap:
+				self._connectionMap[port] = serialConnection(port, 'color')
+		for key in self._connectionMap.keys():
+			if key not in serialList and not self._connectionMap[key].isActiveConnectionOpen():
+				self._connectionMap.pop(key)
+		return self._connectionMap.values()
+
+	def getIconID(self):
+		return 6
+
+	def getPriority(self):
+		return 50	
+
 class serialConnection(printerConnectionBase.printerConnectionBase):
 	"""
 	A serial connection. Needs to build an active-connection.
@@ -51,9 +75,10 @@ class serialConnection(printerConnectionBase.printerConnectionBase):
 
 	This class communicates with the Cura.serialCommunication module trough stdin/stdout pipes.
 	"""
-	def __init__(self, port):
+	def __init__(self, port, machine='printer'):
 		super(serialConnection, self).__init__(port)
 		self._portName = port
+		self._machineType = machine
 
 		self._process = None
 		self._thread = None
@@ -178,10 +203,10 @@ class serialConnection(printerConnectionBase.printerConnectionBase):
 	def _serialCommunicationThread(self):
 		if platform.system() == "Darwin" and hasattr(sys, 'frozen'):
 			cmdList = [os.path.join(os.path.dirname(sys.executable), 'Cura'), '--serialCommunication']
-			cmdList += [self._portName + ':' + profile.getMachineSetting('serial_baud') + ':printer'] #TODO: don't hardcode printer
+			cmdList += [self._portName + ':' + profile.getMachineSetting('serial_baud') + ':' + self._machineType] #TODO: don't hardcode printer
 		else:
 			cmdList = [sys.executable, '-m', 'Cura.serialCommunication']
-			cmdList += [self._portName, profile.getMachineSetting('serial_baud'), 'printer']
+			cmdList += [self._portName, profile.getMachineSetting('serial_baud'), self._machineType]
 		if platform.system() == "Darwin":
 			if platform.machine() == 'i386':
 				cmdList = ['arch', '-i386'] + cmdList
@@ -193,6 +218,7 @@ class serialConnection(printerConnectionBase.printerConnectionBase):
 			if line[0] == '':
 				pass
 			elif line[0] == 'log':
+				print "log:" + line[1]
 				self._log.append(line[1])
 				if len(self._log) > 30:
 					self._log.pop(0)
@@ -204,6 +230,7 @@ class serialConnection(printerConnectionBase.printerConnectionBase):
 				self._targetBedTemperature = float(line[3])
 				self._doCallback()
 			elif line[0] == 'message':
+				print "msg:"+line[1]
 				self._doCallback(line[1])
 			elif line[0] == 'state':
 				line = line[1].split(':', 1)
