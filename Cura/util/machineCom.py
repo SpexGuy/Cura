@@ -749,6 +749,11 @@ class ColorCom(MachineCom):
 				baudrate = int(profile.getMachineSetting('serial_baud'))
 		super(ColorCom, self).__init__(port, baudrate, callbackObject)
 
+	def _preprocessCommand(self, cmd):
+		if 'M110' in cmd:
+			return 'M110'
+		return cmd
+
 	def _makeVirtualMachine(self):
 		return VirtualColorDevice()
 

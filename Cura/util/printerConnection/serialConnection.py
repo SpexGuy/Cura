@@ -215,12 +215,13 @@ class serialConnection(printerConnectionBase.printerConnectionBase):
 		while len(line) > 0:
 			line = line.strip()
 			line = line.split(':', 1)
+			if len(line) > 1:
+				print "INFO:%s:%s" % (line[0], line[1])
 			if line[0] == '':
 				pass
 			elif line[0] == 'log':
-				print "log:" + line[1]
 				self._log.append(line[1])
-				if len(self._log) > 30:
+				if len(self._log) > 30: 
 					self._log.pop(0)
 			elif line[0] == 'temp':
 				line = line[1].split(':')
@@ -230,7 +231,6 @@ class serialConnection(printerConnectionBase.printerConnectionBase):
 				self._targetBedTemperature = float(line[3])
 				self._doCallback()
 			elif line[0] == 'message':
-				print "msg:"+line[1]
 				self._doCallback(line[1])
 			elif line[0] == 'state':
 				line = line[1].split(':', 1)

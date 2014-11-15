@@ -424,7 +424,8 @@ class printWindowBasic(wx.Frame):
 	def __doPrinterConnectionUpdate(self, connection, extraInfo):
 		t = time.time()
 		if self._lastUpdateTime + 0.5 > t and extraInfo is None:
-			return
+			print "Update too soon!"
+			#return # TODO: This is buggy sometimes
 		self._lastUpdateTime = t
 
 		if extraInfo is not None:
@@ -443,6 +444,9 @@ class printWindowBasic(wx.Frame):
 			info += ' Bed: %d' % (self._printerConnection.getBedTemperature())
 		info += '\n\n'
 		self.statsText.SetLabel(info)
+
+	def _addTermLog(self, msg):
+		pass
 
 	def _updateButtonStates(self):
 		self.connectButton.Show(self._printerConnection.hasActiveConnection())

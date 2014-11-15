@@ -277,7 +277,7 @@ class SceneView(openglGui.glGuiPanel):
 			for connection in connections:
 				i = menu.Append(-1, _("Print with %s") % (connection.getName()))
 				menu.connectionMap[i.GetId()] = connection
-				self.Bind(wx.EVT_MENU, lambda e: self._openPrintWindowForConnection(e.GetEventObject().connectionMap[e.GetId()]), i)
+				self.Bind(wx.EVT_MENU, lambda e: self._openPrintWindowForConnection(e.GetEventObject().connectionMap[e.GetId()], self._getColorGCode(lambda r, p: None)), i)
 			self.Bind(wx.EVT_MENU, lambda e: self.showSaveColorGCode(), menu.Append(-1, _("Save GCode...")))
 			self.PopupMenu(menu)
 			menu.Destroy()
