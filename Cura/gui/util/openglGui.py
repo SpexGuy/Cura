@@ -1334,14 +1334,15 @@ class glRangeSelect(glGuiControl):
 			glPushMatrix()
 			glTranslate(0.0,scrollLength/2,0)
 
-			glTranslate(-w/2,openglHelpers.glGetStringSize(str(self._minValue))[1]/2,0)
-			openglHelpers.glDrawStringRight(str(self._minValue))
+			glTranslate(-w/2,openglHelpers.glGetStringSize(str(self._minValue+1))[1]/2,0)
+			openglHelpers.glDrawStringRight(str(self._minValue+1))
 
 			if self.hasSelected():
-				glPushMatrix()
-				glTranslate(w,-minHeight,0)
-				openglHelpers.glDrawStringLeft(str(minSelect))
-				glPopMatrix()
+				if minSelect + 1 != maxSelect:
+					glPushMatrix()
+					glTranslate(w,-minHeight,0)
+					openglHelpers.glDrawStringLeft(str(minSelect+1))
+					glPopMatrix()
 				glPushMatrix()
 				glTranslate(w,-maxHeight,0)
 				openglHelpers.glDrawStringLeft(str(maxSelect))

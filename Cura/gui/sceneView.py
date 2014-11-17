@@ -107,8 +107,8 @@ class SceneView(openglGui.glGuiPanel):
 
 		self.viewSelection = openglGui.glComboButton(self, _("View mode"), [7,19,11,15,23,23], [_("Normal"), _("Overhang"), _("Transparent"), _("X-Ray"), _("Layers"), _("Colors")], (-1,0), self.OnViewChange)
 
-		self.layerColors = openglGui.glColorRangeSelect(self, (-1.5, -3), 0, 1950, (0,1,1), lambda: self.updateColor())
-		self.layerColorer = openglGui.glColorPicker(self, (-2, -5.4), (0,1,1), lambda: self.layerColors.setColor(self.layerColorer.getColor()))
+		self.layerColors = openglGui.glColorRangeSelect(self, (-1.5, -3), 0, 1950, (1,1,1), lambda: self.updateColor())
+		self.layerColorer = openglGui.glColorPicker(self, (-2, -5.4), (1,1,1), lambda: self.layerColors.setColor(self.layerColorer.getColor()))
 
 		self.youMagineButton = openglGui.glButton(self, 26, _("Share on YouMagine"), (3,0), lambda button: youmagineGui.youmagineManager(self.GetTopLevelParent(), self._scene))
 		self.youMagineButton.setDisabled(True)
@@ -433,24 +433,27 @@ class SceneView(openglGui.glGuiPanel):
 		layers = result.waitForGCodeLayers(progressCallback)
 		colorCode = bigDataStorage.BigDataStorage()
 		colorCode.write(';LAYERS:\n')
-		for layer in layers:
-			elen = sum(map(lambda stroke: stroke['extrusion'].sum(), layer))
-			colorCode.write(';  %d\n' % (elen))
+		for n in xrange(len(layers)):
+			extrusions = map(lambda stroke: sum(map(lambda x: x if x > 0 else 0, stroke['extrusion'])), layers[n])
+			elen = sum(extrusions)
+			colorCode.write(';  %d: ' % (n))
+			colorCode.write(str(extrusions))
+			colorCode.write(' (%f)\n' % (elen))
 		colorCode.write(';COLORS:\n')
 		for n in xrange(len(self._colorLayers)):
-			colorCode.write(';  %d:%02x%02x%02x\n' % (self._colorLayers[n], self._colorColors[n][0] * 255, self._colorColors[n][1] * 255, self._colorColors[n][2] * 255))
+			colorCode.write(';  %d: %02x%02x%02x\n' % (self._colorLayers[n], self._colorColors[n][0] * 255, self._colorColors[n][1] * 255, self._colorColors[n][2] * 255))
 
 		colorCode.write('G100\n') # start the print with a flush
 		numLayers = len(layers)
-		lastLayer = 0
+		lastLayer = 1
 		print self._colorLayers
 		for n in xrange(len(self._colorLayers)):
 			# Calculate GCode params for color
 			color = self._colorColors[n]
 			maxColor = max(color)
-			c = (maxColor-color[0])/maxColor
-			m = (maxColor-color[1])/maxColor
-			y = (maxColor-color[2])/maxColor
+			c = (maxColor-color[0])/maxColor if maxColor != 0 else 0
+			m = (maxColor-color[1])/maxColor if maxColor != 0 else 0
+			y = (maxColor-color[2])/maxColor if maxColor != 0 else 0
 			k = 1-maxColor
 			# Round values for boolean markers
 			c = 255 if c > 0.5 else 0
@@ -458,19 +461,25 @@ class SceneView(openglGui.glGuiPanel):
 			y = 255 if y > 0.5 else 0
 			k = 255 if k > 0.5 else 0
 			# Find the start and end layer
-			layer = self._colorLayers[n]
+			layer = self._colorLayers[n]+1
 			# Truncate to max layer
 			truncated = layer > numLayers
 			if truncated:
 				layer = numLayers
 			# Total the filament length
-			e = sum(map(lambda lyr: sum(map(lambda stroke: stroke['extrusion'].sum(), lyr)), layers[lastLayer:layer]))
+			e = sum(map(
+				lambda lyr:
+					sum(map(lambda stroke:
+						sum(map(lambda x: x if x > 0 else 0, stroke['extrusion'])),
+					lyr)),
+				layers[lastLayer:layer]))
 			e *= 48.23 # convert to ESteps
 			# Add the instruction
 			colorCode.write("G1 C%d M%d Y%d K%d E%d ;Layers %d to %d\n" % (c, m, y, k, e, lastLayer, layer))
 			lastLayer = layer
 			# Done if truncated
 			if truncated:
+				colorCode.write('; Truncated!\n')
 				break
 
 		colorCode.write('G100\n') # end the print with a flush
