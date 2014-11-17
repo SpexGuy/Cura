@@ -432,6 +432,14 @@ class SceneView(openglGui.glGuiPanel):
 		result = self._engine.getResult()
 		layers = result.waitForGCodeLayers(progressCallback)
 		colorCode = bigDataStorage.BigDataStorage()
+		colorCode.write(';LAYERS:\n')
+		for layer in layers:
+			elen = sum(map(lambda stroke: stroke['extrusion'].sum(), layer))
+			colorCode.write(';  %d\n' % (elen))
+		colorCode.write(';COLORS:\n')
+		for n in xrange(len(self._colorLayers)):
+			colorCode.write(';  %d:%02x%02x%02x\n' % (self._colorLayers[n], self._colorColors[n][0] * 255, self._colorColors[n][1] * 255, self._colorColors[n][2] * 255))
+
 		colorCode.write('G100\n') # start the print with a flush
 		numLayers = len(layers)
 		lastLayer = 0
@@ -1115,21 +1123,32 @@ class SceneView(openglGui.glGuiPanel):
 						return vec4(vec3(1.0 - smoothstep(0, 100, length(vertex_position))), 1);
 					}
 
-					vec4 getLayerColor(int layer)
+					int getLayerIndex(int layer)
 					{
 						// binary search for closest preceding layer start, and return the associated color
-						if (layer < 0) return getDistanceColor();
 						int lowerbound = 0;
 						int upperbound = num_layers;
 						int position = (lowerbound + upperbound) / 2;
-						while((layer_starts[position] != layer) && (lowerbound < upperbound))
+						while(lowerbound < upperbound)
 						{
-							if (layer_starts[position] > layer)
+							if (layer_starts[position] == layer)
+								return position;
+							else if (layer_starts[position] > layer)
 								upperbound = position;
 							else
 								lowerbound = position + 1;
 							position = (lowerbound + upperbound) / 2;
 						}
+						return position;
+					}
+
+					vec4 getLayerColor(int layer)
+					{
+						if (layer < 0)
+							return getDistanceColor();
+						int position = getLayerIndex(layer + 1); // Layer colors are (min, max]
+						if (position >= num_layers)
+							return layer_colors[num_layers - 1];
 						return layer_colors[position];
 					}
 

@@ -1445,6 +1445,9 @@ class glColorRangeSelect(glRangeSelect):
 		for n in reversed(xrange(len(self._layers)-1)):
 			if self._layers[n] == self._layers[n+1]:
 				self._clearRange(n, n+1)
+		# remove layers below the minimum
+		while(self._layers[0] <= minValue):
+			self._clearRange(0, 1)
 		# update internal values
 		self._minValue = minValue
 		self._maxValue = maxValue
@@ -1462,22 +1465,24 @@ class glColorRangeSelect(glRangeSelect):
 
 		minLayer = self.getMinSelect()
 		maxLayer = self.getMaxSelect()
-		minIndex, minExists = self.findLayerIndex(minLayer-1)
+		minIndex, minExists = self.findLayerIndex(minLayer)
 		if not minExists: # duplicate the lower color to preserve it
 			if minLayer == self._minValue:
 				minIndex -= 1 # minIndex is truly 0
 			else:
-				self._addColor(minLayer-1, minIndex, self._colors[minIndex])
+				self._addColor(minLayer, minIndex, self._colors[minIndex])
 
-		maxIndex, maxExists = self.findLayerIndex(maxLayer-1)
+		maxIndex, maxExists = self.findLayerIndex(maxLayer)
 		self._clearRange(minIndex+1, maxIndex)
 		maxIndex = minIndex + 1
 
 		if not maxExists:
-			self._addColor(maxLayer-1, maxIndex, color)
+			self._addColor(maxLayer, maxIndex, color)
 		else:
 			self._colors[maxIndex] = color
 		self._callback()
+		#print "Layers: "+str(self._layers)
+		#print "Colors: "+str(self._colors)
 
 	def _addColor(self, layer, index, color):
 		self._layers.insert(index, layer)
