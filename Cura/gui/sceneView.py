@@ -26,7 +26,6 @@ from Cura.util import bigDataStorage
 from Cura.gui.util import previewTools
 from Cura.gui.util import openglHelpers
 from Cura.gui.util import openglGui
-from Cura.gui.util import engineResultView
 from Cura.gui.tools import youmagineGui
 from Cura.gui.tools import imageToMesh
 
@@ -119,21 +118,6 @@ class SceneView(openglGui.glGuiPanel):
 		self._colorLayers = self.layerColors.getLayers()
 		self._colorColors = self.layerColors.getColors()
 
-	def loadGCodeFile(self, filename):
-		self.OnDeleteAll(None)
-		#Cheat the engine results to load a GCode file into it.
-#		self._engine._result = sliceEngine.EngineResult()
-#		with open(filename, "r") as f:
-#			self._engine._result.setGCode(f.read())
-#		self._engine._result.setFinished(True)
-#		self._engineResultView.setResult(self._engine._result)
-#		self.printButton.setBottomText('')
-#		self.viewSelection.setValue(4)
-#		self.printButton.setDisabled(False)
-#		self.printFilamentButton.setDisabled(False)
-		self.youMagineButton.setDisabled(True)
-#		self.OnViewChange()
-
 	def loadSceneFiles(self, filenames):
 		self.youMagineButton.setDisabled(False)
 		self.loadScene(filenames)
@@ -151,8 +135,7 @@ class SceneView(openglGui.glGuiPanel):
 				gcodeFilename = filename
 				mainWindow.addToModelMRU(filename)
 		if gcodeFilename is not None:
-
-			self.loadGCodeFile(gcodeFilename)
+			self.notification.message("Spectrom does not yet support pre-sliced G-Code files.")
 		else:
 			# process directories and special file types
 			# and keep scene files for later processing
@@ -167,10 +150,7 @@ class SceneView(openglGui.glGuiPanel):
 					filenames.extend(os.path.join(filename, f) for f in os.listdir(filename))
 				else:
 					ext = os.path.splitext(filename)[1].lower()
-					if ext == '.ini':
-						profile.loadProfile(filename)
-						mainWindow.addToProfileMRU(filename)
-					elif ext in meshLoader.loadSupportedExtensions() or ext in imageToMesh.supportedExtensions():
+					if ext in meshLoader.loadSupportedExtensions() or ext in imageToMesh.supportedExtensions():
 						scene_filenames.append(filename)
 						mainWindow.addToModelMRU(filename)
 					else:
@@ -201,14 +181,12 @@ class SceneView(openglGui.glGuiPanel):
 		if button == 1:
 			dlg=wx.FileDialog(self, _("Open 3D model"), os.path.split(profile.getPreference('lastFile'))[0], style=wx.FD_OPEN|wx.FD_FILE_MUST_EXIST|wx.FD_MULTIPLE)
 
-			wildcardList = ';'.join(map(lambda s: '*' + s, meshLoader.loadSupportedExtensions() + imageToMesh.supportedExtensions() + ['.g', '.gcode']))
+			wildcardList = ';'.join(map(lambda s: '*' + s, meshLoader.loadSupportedExtensions() + imageToMesh.supportedExtensions()))
 			wildcardFilter = "All (%s)|%s;%s" % (wildcardList, wildcardList, wildcardList.upper())
 			wildcardList = ';'.join(map(lambda s: '*' + s, meshLoader.loadSupportedExtensions()))
 			wildcardFilter += "|Mesh files (%s)|%s;%s" % (wildcardList, wildcardList, wildcardList.upper())
 			wildcardList = ';'.join(map(lambda s: '*' + s, imageToMesh.supportedExtensions()))
 			wildcardFilter += "|Image files (%s)|%s;%s" % (wildcardList, wildcardList, wildcardList.upper())
-			wildcardList = ';'.join(map(lambda s: '*' + s, ['.g', '.gcode']))
-			wildcardFilter += "|GCode files (%s)|%s;%s" % (wildcardList, wildcardList, wildcardList.upper())
 
 			dlg.SetWildcard(wildcardFilter)
 			if dlg.ShowModal() != wx.ID_OK:

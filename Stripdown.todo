@@ -4,7 +4,6 @@ STACK:
 TODO:
 OnProfileMRU()
 addToProfileMRU()
-scene.loadGCodeFile()
 
 
 TOGREP:
@@ -55,6 +54,8 @@ scene._printerConnectionManager
 scene._colorConnectionManager
 scene._openPrintWindowForConnection()
 
+scene.loadGCodeFile()
+
 scene.viewSelection
 scene.OnViewChange()
 scene._engineResultView
@@ -65,8 +66,12 @@ scene._showEngineLog()
 scene._updateEngineProgress()
 scene._isSimpleMode
 
+<-engineResultView
+<-sliceEngine
+
 
 CLOSED:
 scene<-sliceEngine
 scene<-printerConnectionManager
 scene<-printWindow
+scene<-engineResultView
