@@ -2,23 +2,19 @@ STACK:
 
 
 TODO:
-scene.OnPrintButton()
-scene.showSaveGCode()
-scene._showEngineLog()
-preferencesDialog.machineSettingsDialog
-OnLoadProfileFromGCode()
-normalModeOnlyItems
-
-profileHistoryMenu
-OnExpertOpen()
+OnProfileMRU()
+addToProfileMRU()
+scene.loadGCodeFile()
 
 
 TOGREP:
+profileHistoryMenu
+OnLoadProfileFromGCode()
+OnExpertOpen()
 machineMenu
 updateMachineMenu()
 OnSelectMachine()
 OnMachineSettings()
-
 defaultFirmwareInstallMenuItem
 OnDefaultMarlinFirmware()
 OnAutoFirmwareUpdate()
@@ -39,11 +35,38 @@ OnSimpleSwitch()
 switchToNormalMenuItem
 OnNormalSwitch()
 {startMode}
+normalModeOnlyItems
 
 onOneAtATimeSwitch
 allAtOnceItem
 {oneAtATime}
 oneAtATime
 
+scene.printButton
+scene.OnPrintButton()
+scene.showSaveGCode()
+scene._saveGCode()
+scene.printFilamentButton
+scene.OnPrintFilamentButton()
+scene.showSaveColorGCode()
+scene._saveColorGCode()
+scene._getColorGCode()
+scene._printerConnectionManager
+scene._colorConnectionManager
+scene._openPrintWindowForConnection()
 
-GREPPED:
+scene.viewSelection
+scene.OnViewChange()
+scene._engineResultView
+scene._engine
+scene._sceneUpdateTimer
+scene._onRunEngine()
+scene._showEngineLog()
+scene._updateEngineProgress()
+scene._isSimpleMode
+
+
+CLOSED:
+scene<-sliceEngine
+scene<-printerConnectionManager
+scene<-printWindow

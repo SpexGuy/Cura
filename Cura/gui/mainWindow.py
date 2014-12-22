@@ -46,8 +46,6 @@ class mainWindow(wx.Frame):
 			except:
 				pass
 
-		self.normalModeOnlyItems = []
-
 		mruFile = os.path.join(profile.getBasePath(), 'mru_filelist.ini')
 		self.config = wx.FileConfig(appName="Cura",
 						localFilename=mruFile,
@@ -86,56 +84,16 @@ class mainWindow(wx.Frame):
 			i = self.fileMenu.Append(-1, _("Minecraft map import..."))
 			self.Bind(wx.EVT_MENU, self.OnMinecraftImport, i)
 
-		#self.fileMenu.AppendSeparator()
-		#TODO: filter these options
-		#i = self.fileMenu.Append(-1, _("Open Profile..."))
-		#self.normalModeOnlyItems.append(i)
-		#self.Bind(wx.EVT_MENU, self.OnLoadProfile, i)
-		#i = self.fileMenu.Append(-1, _("Save Profile..."))
-		#self.normalModeOnlyItems.append(i)
-		#self.Bind(wx.EVT_MENU, self.OnSaveProfile, i)
-		#self.fileMenu.AppendSeparator()
-		#i = self.fileMenu.Append(-1, _("Reset Profile to default"))
-		#self.normalModeOnlyItems.append(i)
-		#self.Bind(wx.EVT_MENU, self.OnResetProfile, i)
-
-#		self.fileMenu.AppendSeparator()
-#		i = self.fileMenu.Append(-1, _("Preferences...\tCTRL+,"))
-#		self.Bind(wx.EVT_MENU, self.OnPreferences, i)
-#		self.fileMenu.AppendSeparator()
-
-		# Profle MRU list
-		#profileHistoryMenu = wx.Menu()
-		#self.fileMenu.AppendMenu(wx.NewId(), _("Recent Profile Files"), profileHistoryMenu)
-		#self.profileFileHistory.UseMenu(profileHistoryMenu)
-		#self.profileFileHistory.AddFilesToMenu()
-		#self.Bind(wx.EVT_MENU_RANGE, self.OnProfileMRU, id=self.ID_MRU_PROFILE1, id2=self.ID_MRU_PROFILE10)
-
 		self.fileMenu.AppendSeparator()
 		i = self.fileMenu.Append(wx.ID_EXIT, _("Quit"))
 		self.Bind(wx.EVT_MENU, self.OnQuit, i)
 		self.menubar.Append(self.fileMenu, '&' + _("File"))
-
-		#i = toolsMenu.Append(-1, 'Batch run...')
-		#self.Bind(wx.EVT_MENU, self.OnBatchRun, i)
-		#self.normalModeOnlyItems.append(i)
-
 
 		if version.isDevVersion():
 			toolsMenu = wx.Menu()
 			i = toolsMenu.Append(-1, _("PID Debugger..."))
 			self.Bind(wx.EVT_MENU, self.OnPIDDebugger, i)
 			self.menubar.Append(toolsMenu, _("Debug"))
-
-#		expertMenu = wx.Menu()
-#		i = expertMenu.Append(-1, _("Open expert settings...\tCTRL+E"))
-#		self.normalModeOnlyItems.append(i)
-#		self.Bind(wx.EVT_MENU, self.OnExpertOpen, i)
-#		expertMenu.AppendSeparator()
-#		i = expertMenu.Append(-1, _("Run first run wizard..."))
-#		self.Bind(wx.EVT_MENU, self.OnFirstRunWizard, i)
-
-#		self.menubar.Append(expertMenu, _("Expert"))
 
 		helpMenu = wx.Menu()
 		i = helpMenu.Append(-1, _("Online documentation..."))
@@ -207,7 +165,8 @@ class mainWindow(wx.Frame):
 			self.SetSize((800,600))
 			self.Centre()
 
-		self.updateSliceMode()
+		self.scene.updateProfileToControls()
+		self.scene._scene.pushFree()
 		self.scene.SetFocus()
 		self.dialogframe = None
 		Publisher().subscribe(self.onPluginUpdate, "pluginupdate")
@@ -266,15 +225,6 @@ class mainWindow(wx.Frame):
 			print "Unable to read from clipboard"
 
 
-	def updateSliceMode(self):
-		isSimple = profile.getPreference('startMode') == 'Simple'
-
-		for i in self.normalModeOnlyItems:
-			i.Enable(not isSimple)
-
-		self.scene.updateProfileToControls()
-		self.scene._scene.pushFree()
-
 	def OnPreferences(self, e):
 		prefDialog = preferencesDialog.preferencesDialog(self)
 		prefDialog.Centre()
@@ -326,70 +276,6 @@ class mainWindow(wx.Frame):
 
 	def updateProfileToAllControls(self):
 		self.scene.updateProfileToControls()
-
-	def reloadSettingPanels(self):
-		self.updateSliceMode()
-		self.updateProfileToAllControls()
-
-	def OnLoadProfile(self, e):
-		dlg=wx.FileDialog(self, _("Select profile file to load"), os.path.split(profile.getPreference('lastFile'))[0], style=wx.FD_OPEN|wx.FD_FILE_MUST_EXIST)
-		dlg.SetWildcard("ini files (*.ini)|*.ini")
-		if dlg.ShowModal() == wx.ID_OK:
-			profileFile = dlg.GetPath()
-			profile.loadProfile(profileFile)
-			self.updateProfileToAllControls()
-
-			# Update the Profile MRU
-			self.addToProfileMRU(profileFile)
-		dlg.Destroy()
-
-	def OnLoadProfileFromGcode(self, e):
-		dlg=wx.FileDialog(self, _("Select gcode file to load profile from"), os.path.split(profile.getPreference('lastFile'))[0], style=wx.FD_OPEN|wx.FD_FILE_MUST_EXIST)
-		dlg.SetWildcard("gcode files (*%s)|*%s;*%s" % (profile.getGCodeExtension(), profile.getGCodeExtension(), profile.getGCodeExtension()[0:2]))
-		if dlg.ShowModal() == wx.ID_OK:
-			gcodeFile = dlg.GetPath()
-			f = open(gcodeFile, 'r')
-			hasProfile = False
-			for line in f:
-				if line.startswith(';CURA_PROFILE_STRING:'):
-					profile.setProfileFromString(line[line.find(':')+1:].strip())
-					if ';{profile_string}' not in profile.getAlterationFile('end.gcode'):
-						profile.setAlterationFile('end.gcode', profile.getAlterationFile('end.gcode') + '\n;{profile_string}')
-					hasProfile = True
-			if hasProfile:
-				self.updateProfileToAllControls()
-			else:
-				wx.MessageBox(_("No profile found in GCode file.\nThis feature only works with GCode files made by Cura 12.07 or newer."), _("Profile load error"), wx.OK | wx.ICON_INFORMATION)
-		dlg.Destroy()
-
-	def OnSaveProfile(self, e):
-		dlg=wx.FileDialog(self, _("Select profile file to save"), os.path.split(profile.getPreference('lastFile'))[0], style=wx.FD_SAVE)
-		dlg.SetWildcard("ini files (*.ini)|*.ini")
-		if dlg.ShowModal() == wx.ID_OK:
-			profileFile = dlg.GetPath()
-			if not profileFile.lower().endswith('.ini'): #hack for linux, as for some reason the .ini is not appended.
-				profileFile += '.ini'
-			profile.saveProfile(profileFile)
-		dlg.Destroy()
-
-	def OnResetProfile(self, e):
-		dlg = wx.MessageDialog(self, _("This will reset all profile settings to defaults.\nUnless you have saved your current profile, all settings will be lost!\nDo you really want to reset?"), _("Profile reset"), wx.YES_NO | wx.ICON_QUESTION)
-		result = dlg.ShowModal() == wx.ID_YES
-		dlg.Destroy()
-		if result:
-			profile.resetProfile()
-			self.updateProfileToAllControls()
-
-	def OnFirstRunWizard(self, e):
-		self.Hide()
-		configWizard.configWizard()
-		self.Show()
-		self.reloadSettingPanels()
-
-	def OnExpertOpen(self, e):
-		ecw = expertConfig.expertConfigWindow(lambda : self.scene.sceneUpdated())
-		ecw.Centre()
-		ecw.Show()
 
 	def OnMinecraftImport(self, e):
 		mi = minecraftImport.minecraftImportWindow(self)
@@ -443,7 +329,6 @@ class mainWindow(wx.Frame):
 		#HACK: Set the paint function of the glCanvas to nothing so it won't keep refreshing. Which can keep wxWidgets from quiting.
 		print "Closing down"
 		self.scene.OnPaint = lambda e : e
-		self.scene._engine.cleanup()
 		self.Destroy()
 
 	def OnQuit(self, e):
