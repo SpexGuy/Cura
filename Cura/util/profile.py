@@ -464,7 +464,6 @@ setting('postSwitchExtruder.gcode', """;Switch between the current extruder and 
 ;This code is added after the T(n)
 """, str, 'alteration', 'alteration')
 
-setting('startMode', 'Simple', ['Simple', 'Normal'], 'preference', 'hidden')
 setting('oneAtATime', 'True', bool, 'preference', 'hidden')
 setting('lastFile', os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'resources', 'example', 'UltimakerRobot_support.stl')), str, 'preference', 'hidden')
 setting('save_profile', 'False', bool, 'preference', 'hidden').setLabel(_("Save profile on slice"), _("When slicing save the profile as [stl_file]_profile.ini next to the model."))
@@ -473,7 +472,6 @@ setting('filament_cost_meter', '0', float, 'preference', 'hidden').setLabel(_("C
 setting('auto_detect_sd', 'True', bool, 'preference', 'hidden').setLabel(_("Auto detect SD card drive"), _("Auto detect the SD card. You can disable this because on some systems external hard-drives or USB sticks are detected as SD card."))
 setting('check_for_updates', 'True', bool, 'preference', 'hidden').setLabel(_("Check for updates"), _("Check for newer versions of Cura on startup"))
 setting('submit_slice_information', 'False', bool, 'preference', 'hidden').setLabel(_("Send usage statistics"), _("Submit anonymous usage information to improve future versions of Cura"))
-setting('youmagine_token', '', str, 'preference', 'hidden')
 setting('filament_physical_density', '1240', float, 'preference', 'hidden').setRange(500.0, 3000.0).setLabel(_("Density (kg/m3)"), _("Weight of the filament per m3. Around 1240 for PLA. And around 1040 for ABS. This value is used to estimate the weight if the filament used for the print."))
 setting('language', 'English', str, 'preference', 'hidden').setLabel(_('Language'), _('Change the language in which Cura runs. Switching language requires a restart of Cura'))
 setting('active_machine', '0', int, 'preference', 'hidden')
@@ -489,7 +487,6 @@ setting('window_pos_x', '-1', float, 'preference', 'hidden')
 setting('window_pos_y', '-1', float, 'preference', 'hidden')
 setting('window_width', '-1', float, 'preference', 'hidden')
 setting('window_height', '-1', float, 'preference', 'hidden')
-setting('window_normal_sash', '320', float, 'preference', 'hidden')
 setting('last_run_version', '', str, 'preference', 'hidden')
 
 setting('machine_name', '', str, 'machine', 'hidden')
@@ -1156,137 +1153,3 @@ def getColorGCodeExtension():
 	if getMachineSetting('color_gcode_flavor') == 'Spectrom':
 		return '.spectrom'
 	return '.filament'
-
-#########################################################
-## Alteration file functions
-#########################################################
-def replaceTagMatch(m):
-	pre = m.group(1)
-	tag = m.group(2)
-	if tag == 'time':
-		return pre + time.strftime('%H:%M:%S')
-	if tag == 'date':
-		return pre + time.strftime('%d-%m-%Y')
-	if tag == 'day':
-		return pre + ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][int(time.strftime('%w'))]
-	if tag == 'print_time':
-		return pre + '#P_TIME#'
-	if tag == 'filament_amount':
-		return pre + '#F_AMNT#'
-	if tag == 'filament_weight':
-		return pre + '#F_WGHT#'
-	if tag == 'filament_cost':
-		return pre + '#F_COST#'
-	if tag == 'profile_string':
-		return pre + 'CURA_PROFILE_STRING:%s' % (getProfileString())
-	if pre == 'F' and tag == 'max_z_speed':
-		f = getProfileSettingFloat('travel_speed') * 60
-	if pre == 'F' and tag in ['print_speed', 'retraction_speed', 'travel_speed', 'bottom_layer_speed', 'cool_min_feedrate']:
-		f = getProfileSettingFloat(tag) * 60
-	elif isProfileSetting(tag):
-		f = getProfileSettingFloat(tag)
-	elif isPreference(tag):
-		f = getProfileSettingFloat(tag)
-	else:
-		return '%s?%s?' % (pre, tag)
-	if (f % 1) == 0:
-		return pre + str(int(f))
-	return pre + str(f)
-
-def replaceGCodeTags(filename, gcodeInt):
-	f = open(filename, 'r+')
-	data = f.read(2048)
-	data = data.replace('#P_TIME#', ('%5d:%02d' % (int(gcodeInt.totalMoveTimeMinute / 60), int(gcodeInt.totalMoveTimeMinute % 60)))[-8:])
-	data = data.replace('#F_AMNT#', ('%8.2f' % (gcodeInt.extrusionAmount / 1000))[-8:])
-	data = data.replace('#F_WGHT#', ('%8.2f' % (gcodeInt.calculateWeight() * 1000))[-8:])
-	cost = gcodeInt.calculateCost()
-	if cost is None:
-		cost = 'Unknown'
-	data = data.replace('#F_COST#', ('%8s' % (cost.split(' ')[0]))[-8:])
-	f.seek(0)
-	f.write(data)
-	f.close()
-
-def replaceGCodeTagsFromSlicer(filename, slicerInt):
-	f = open(filename, 'r+')
-	data = f.read(2048)
-	data = data.replace('#P_TIME#', ('%8.2f' % (int(slicerInt._printTimeSeconds)))[-8:])
-	data = data.replace('#F_AMNT#', ('%8.2f' % (slicerInt._filamentMM[0]))[-8:])
-	data = data.replace('#F_WGHT#', ('%8.2f' % (float(slicerInt.getFilamentWeight()) * 1000))[-8:])
-	cost = slicerInt.getFilamentCost()
-	if cost is None:
-		cost = 'Unknown'
-	data = data.replace('#F_COST#', ('%8s' % (cost.split(' ')[0]))[-8:])
-	f.seek(0)
-	f.write(data)
-	f.close()
-
-### Get aleration raw contents. (Used internally in Cura)
-def getAlterationFile(filename):
-	if filename in tempOverride:
-		return tempOverride[filename]
-	global settingsDictionary
-	if filename in settingsDictionary and settingsDictionary[filename].isAlteration():
-		return settingsDictionary[filename].getValue()
-	traceback.print_stack()
-	sys.stderr.write('Error: "%s" not found in alteration settings\n' % (filename))
-	return ''
-
-def setAlterationFile(name, value):
-	#Check if we have a configuration file loaded, else load the default.
-	global settingsDictionary
-	if name in settingsDictionary and settingsDictionary[name].isAlteration():
-		settingsDictionary[name].setValue(value)
-	saveProfile(getDefaultProfilePath(), True)
-
-def isTagIn(tag, contents):
-	contents = re.sub(';[^\n]*\n', '', contents)
-	return tag in contents
-
-### Get the alteration file for output. (Used by Skeinforge)
-def getAlterationFileContents(filename, extruderCount = 1):
-	prefix = ''
-	postfix = ''
-	alterationContents = getAlterationFile(filename)
-	if getMachineSetting('gcode_flavor') == 'UltiGCode':
-		if filename == 'end.gcode':
-			return 'M25 ;Stop reading from this point on.\n;CURA_PROFILE_STRING:%s\n' % (getProfileString())
-		return ''
-	if filename == 'start.gcode':
-		if extruderCount > 1:
-			alterationContents = getAlterationFile("start%d.gcode" % (extruderCount))
-		#For the start code, hack the temperature and the steps per E value into it. So the temperature is reached before the start code extrusion.
-		#We also set our steps per E here, if configured.
-		eSteps = getMachineSettingFloat('steps_per_e')
-		if eSteps > 0:
-			prefix += 'M92 E%f\n' % (eSteps)
-		temp = getProfileSettingFloat('print_temperature')
-		bedTemp = 0
-		if getMachineSetting('has_heated_bed') == 'True':
-			bedTemp = getProfileSettingFloat('print_bed_temperature')
-
-		if bedTemp > 0 and not isTagIn('{print_bed_temperature}', alterationContents):
-			prefix += 'M140 S%f\n' % (bedTemp)
-		if temp > 0 and not isTagIn('{print_temperature}', alterationContents):
-			if extruderCount > 0:
-				for n in xrange(1, extruderCount):
-					t = temp
-					if n > 0 and getProfileSettingFloat('print_temperature%d' % (n+1)) > 0:
-						t = getProfileSettingFloat('print_temperature%d' % (n+1))
-					prefix += 'M104 T%d S%f\n' % (n, t)
-				for n in xrange(0, extruderCount):
-					t = temp
-					if n > 0 and getProfileSettingFloat('print_temperature%d' % (n+1)) > 0:
-						t = getProfileSettingFloat('print_temperature%d' % (n+1))
-					prefix += 'M109 T%d S%f\n' % (n, t)
-				prefix += 'T0\n'
-			else:
-				prefix += 'M109 S%f\n' % (temp)
-		if bedTemp > 0 and not isTagIn('{print_bed_temperature}', alterationContents):
-			prefix += 'M190 S%f\n' % (bedTemp)
-	elif filename == 'end.gcode':
-		if extruderCount > 1:
-			alterationContents = getAlterationFile("end%d.gcode" % (extruderCount))
-		#Append the profile string to the end of the GCode, so we can load it from the GCode file later.
-		#postfix = ';CURA_PROFILE_STRING:%s\n' % (getProfileString())
-	return unicode(prefix + re.sub("(.)\{([^\}]*)\}", replaceTagMatch, alterationContents).rstrip() + '\n' + postfix).strip().encode('utf-8') + '\n'

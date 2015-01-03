@@ -6,19 +6,9 @@ import webbrowser
 import sys
 
 
-from Cura.gui import configBase
-from Cura.gui import expertConfig
-from Cura.gui import alterationPanel
-from Cura.gui import pluginPanel
-from Cura.gui import preferencesDialog
-from Cura.gui import configWizard
-from Cura.gui import firmwareInstall
-from Cura.gui import simpleMode
 from Cura.gui import sceneView
 from Cura.gui import aboutWindow
 from Cura.gui.util import dropTarget
-#from Cura.gui.tools import batchRun
-from Cura.gui.tools import pidDebugger
 from Cura.gui.tools import minecraftImport
 from Cura.util import profile
 from Cura.util import version
@@ -56,11 +46,6 @@ class mainWindow(wx.Frame):
 		self.config.SetPath("/ModelMRU")
 		self.modelFileHistory.Load(self.config)
 
-		self.ID_MRU_PROFILE1, self.ID_MRU_PROFILE2, self.ID_MRU_PROFILE3, self.ID_MRU_PROFILE4, self.ID_MRU_PROFILE5, self.ID_MRU_PROFILE6, self.ID_MRU_PROFILE7, self.ID_MRU_PROFILE8, self.ID_MRU_PROFILE9, self.ID_MRU_PROFILE10 = [wx.NewId() for line in xrange(10)]
-		self.profileFileHistory = wx.FileHistory(10, self.ID_MRU_PROFILE1)
-		self.config.SetPath("/ProfileMRU")
-		self.profileFileHistory.Load(self.config)
-
 		self.menubar = wx.MenuBar()
 		self.fileMenu = wx.Menu()
 		i = self.fileMenu.Append(-1, _("Load model file...\tCTRL+L"))
@@ -88,12 +73,6 @@ class mainWindow(wx.Frame):
 		i = self.fileMenu.Append(wx.ID_EXIT, _("Quit"))
 		self.Bind(wx.EVT_MENU, self.OnQuit, i)
 		self.menubar.Append(self.fileMenu, '&' + _("File"))
-
-		if version.isDevVersion():
-			toolsMenu = wx.Menu()
-			i = toolsMenu.Append(-1, _("PID Debugger..."))
-			self.Bind(wx.EVT_MENU, self.OnPIDDebugger, i)
-			self.menubar.Append(toolsMenu, _("Debug"))
 
 		helpMenu = wx.Menu()
 		i = helpMenu.Append(-1, _("Online documentation..."))
@@ -134,7 +113,7 @@ class mainWindow(wx.Frame):
 		self.SetSize((wx.Display().GetClientArea().GetWidth()/2,wx.Display().GetClientArea().GetHeight()/2))
 		self.Centre()
 
-		#Timer set; used to check if profile is on the clipboard
+		# Timer set; used to check if profile is on the clipboard
 		self.timer = wx.Timer(self)
 		self.Bind(wx.EVT_TIMER, self.onTimer)
 		self.timer.Start(1000)
@@ -225,13 +204,6 @@ class mainWindow(wx.Frame):
 			print "Unable to read from clipboard"
 
 
-	def OnPreferences(self, e):
-		prefDialog = preferencesDialog.preferencesDialog(self)
-		prefDialog.Centre()
-		prefDialog.Show()
-		prefDialog.Raise()
-		wx.CallAfter(prefDialog.Show)
-
 	def OnDropFiles(self, files):
 		if len(files) > 0:
 			self.updateProfileToAllControls()
@@ -256,24 +228,6 @@ class mainWindow(wx.Frame):
 		self.modelFileHistory.Save(self.config)
 		self.config.Flush()
 
-	def OnProfileMRU(self, e):
-		fileNum = e.GetId() - self.ID_MRU_PROFILE1
-		path = self.profileFileHistory.GetHistoryFile(fileNum)
-		# Update Profile MRU
-		self.profileFileHistory.AddFileToHistory(path)  # move up the list
-		self.config.SetPath("/ProfileMRU")
-		self.profileFileHistory.Save(self.config)
-		self.config.Flush()
-		# Load Profile
-		profile.loadProfile(path)
-		self.updateProfileToAllControls()
-
-	def addToProfileMRU(self, file):
-		self.profileFileHistory.AddFileToHistory(file)
-		self.config.SetPath("/ProfileMRU")
-		self.profileFileHistory.Save(self.config)
-		self.config.Flush()
-
 	def updateProfileToAllControls(self):
 		self.scene.updateProfileToControls()
 
@@ -281,11 +235,6 @@ class mainWindow(wx.Frame):
 		mi = minecraftImport.minecraftImportWindow(self)
 		mi.Centre()
 		mi.Show(True)
-
-	def OnPIDDebugger(self, e):
-		debugger = pidDebugger.debuggerWindow(self)
-		debugger.Centre()
-		debugger.Show(True)
 
 	def onCopyProfileClipboard(self, e):
 		try:

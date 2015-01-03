@@ -19,14 +19,11 @@ from Cura.util import profile
 from Cura.util import meshLoader
 from Cura.util import objectScene
 from Cura.util import resources
-from Cura.util import pluginInfo
 from Cura.util import removableStorage
 from Cura.util import explorer
-from Cura.util import bigDataStorage
 from Cura.gui.util import previewTools
 from Cura.gui.util import openglHelpers
 from Cura.gui.util import openglGui
-from Cura.gui.tools import youmagineGui
 from Cura.gui.tools import imageToMesh
 
 class SceneView(openglGui.glGuiPanel):
@@ -97,8 +94,9 @@ class SceneView(openglGui.glGuiPanel):
 		self.layerColors = openglGui.glColorRangeSelect(self, (-1.5, -3), 0, 1950, (1,1,1), lambda: self.updateColor())
 		self.layerColorer = openglGui.glColorPicker(self, (-2, -5.4), (1,1,1), lambda: self.layerColors.setColor(self.layerColorer.getColor()))
 
-		self.youMagineButton = openglGui.glButton(self, 26, _("Print with Spectrom"), (1,0), lambda button: youmagineGui.youmagineManager(self.GetTopLevelParent(), self._scene))
-		self.youMagineButton.setDisabled(True)
+		#TODO: spectromButton
+		#self.youMagineButton = openglGui.glButton(self, 26, _("Print with Spectrom"), (1,0), lambda button: youmagineGui.youmagineManager(self.GetTopLevelParent(), self._scene))
+		#self.youMagineButton.setDisabled(True)
 
 		self.notification = openglGui.glNotification(self, (0, 0))
 
@@ -119,7 +117,7 @@ class SceneView(openglGui.glGuiPanel):
 		self._colorColors = self.layerColors.getColors()
 
 	def loadSceneFiles(self, filenames):
-		self.youMagineButton.setDisabled(False)
+		#self.youMagineButton.setDisabled(False)
 		self.loadScene(filenames)
 
 	def loadFiles(self, filenames):
@@ -334,7 +332,6 @@ class SceneView(openglGui.glGuiPanel):
 		while len(self._scene.objects()) > 0:
 			self._deleteObject(self._scene.objects()[0])
 		self._animView = openglGui.animation(self, self._viewTarget.copy(), numpy.array([0,0,0], numpy.float32), 0.5)
-#		self._engineResultView.setResult(None)
 
 	def OnMultiply(self, e):
 		if self._focusObj is None:

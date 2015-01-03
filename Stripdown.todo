@@ -2,13 +2,30 @@ STACK:
 
 
 TODO:
-OnProfileMRU()
-addToProfileMRU()
+version.checkForNewerVersion
+about
+only one stl
+
+TODO_OPT:
+{check_for_updates} := True
 
 
 TOGREP:
+
+
+Profile Settings to Finalize:
+{oneAtATime}
+newVersionDialog
+
+
+CLOSED:
 profileHistoryMenu
+ID_MRU_PROFILE1
+profileFileHistory
+OnPreferences()
 OnLoadProfileFromGCode()
+OnProfileMRU()
+addToProfileMRU()
 OnExpertOpen()
 machineMenu
 updateMachineMenu()
@@ -38,7 +55,6 @@ normalModeOnlyItems
 
 onOneAtATimeSwitch
 allAtOnceItem
-{oneAtATime}
 oneAtATime
 
 scene.printButton
@@ -66,12 +82,25 @@ scene._showEngineLog()
 scene._updateEngineProgress()
 scene._isSimpleMode
 
+<-alterationPanel
+<-avr_isp.*
+<-bigDataStorage
+<-configWizard
 <-engineResultView
+<-firmwareInstall
+<-gcodeGenerator
+<-gcodeInterpreter
+<-gcodeTextArea
+<-machineCom
+<-pidDebugger
+<-pluginInfo
+<-preferencesDialog
+<-printerConnection.*
+<-printWindow
+<-serialCommunication
+<-simpleMode
 <-sliceEngine
-
-
-CLOSED:
-scene<-sliceEngine
-scene<-printerConnectionManager
-scene<-printWindow
-scene<-engineResultView
+<-taskbar
+<-webcam
+<-youmagine
+<-youmagineGui
