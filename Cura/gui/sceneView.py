@@ -25,6 +25,7 @@ from Cura.gui.util import previewTools
 from Cura.gui.util import openglHelpers
 from Cura.gui.util import openglGui
 from Cura.gui.tools import imageToMesh
+from Cura.gui.tools import spectromUploadGui
 
 class SceneView(openglGui.glGuiPanel):
 	def __init__(self, parent):
@@ -94,9 +95,8 @@ class SceneView(openglGui.glGuiPanel):
 		self.layerColors = openglGui.glColorRangeSelect(self, (-1.5, -3), 0, 1950, (1,1,1), lambda: self.updateColor())
 		self.layerColorer = openglGui.glColorPicker(self, (-2, -5.4), (1,1,1), lambda: self.layerColors.setColor(self.layerColorer.getColor()))
 
-		#TODO: spectromButton
-		#self.youMagineButton = openglGui.glButton(self, 26, _("Print with Spectrom"), (1,0), lambda button: youmagineGui.youmagineManager(self.GetTopLevelParent(), self._scene))
-		#self.youMagineButton.setDisabled(True)
+		self.spectromButton = openglGui.glButton(self, 26, _("Upload to Spectrom"), (1,0), lambda button: spectromUploadGui.spectromUploadManager(self.GetTopLevelParent(), self._scene))
+		self.spectromButton.setDisabled(True)
 
 		self.notification = openglGui.glNotification(self, (0, 0))
 
@@ -117,7 +117,7 @@ class SceneView(openglGui.glGuiPanel):
 		self._colorColors = self.layerColors.getColors()
 
 	def loadSceneFiles(self, filenames):
-		#self.youMagineButton.setDisabled(False)
+		self.spectromButton.setDisabled(False)
 		self.loadScene(filenames)
 
 	def loadFiles(self, filenames):

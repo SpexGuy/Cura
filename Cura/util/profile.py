@@ -489,6 +489,11 @@ setting('window_width', '-1', float, 'preference', 'hidden')
 setting('window_height', '-1', float, 'preference', 'hidden')
 setting('last_run_version', '', str, 'preference', 'hidden')
 
+setting('spectrom_firstname', '', str, 'preference', 'hidden')
+setting('spectrom_lastname', '', str, 'preference', 'hidden')
+setting('spectrom_email', '', str, 'preference', 'hidden')
+setting('spectrom_companyname', '', str, 'preference', 'hidden')
+
 setting('machine_name', '', str, 'machine', 'hidden')
 setting('machine_type', 'unknown', str, 'machine', 'hidden') #Ultimaker, Ultimaker2, RepRap
 setting('machine_width', '205', float, 'machine', 'hidden').setLabel(_("Maximum width (mm)"), _("Size of the machine in mm"))
