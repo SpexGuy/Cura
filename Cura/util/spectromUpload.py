@@ -26,14 +26,19 @@ class httpUploadDataStream(object):
 		self._progressCallback = progressCallback
 
 	def write(self, data):
-		size = len(data)
-		if size < 1:
-			return
-		blocks = size / 2048
-		for n in xrange(0, blocks):
-			self._dataList.append(data[n*2048:n*2048+2048])
-		self._dataList.append(data[blocks*2048:])
-		self._totalLength += size
+		if isinstance(data, httpUploadDataStream):
+			for datum in data._dataList:
+				self._dataList.append(datum)
+				self._totalLength += len(datum)
+		else:
+			size = len(data)
+			if size < 1:
+				return
+			blocks = size / 2048
+			for n in xrange(0, blocks):
+				self._dataList.append(data[n*2048:n*2048+2048])
+			self._dataList.append(data[blocks*2048:])
+			self._totalLength += size
 
 	def read(self, size):
 		if self._readPos >= len(self._dataList):
@@ -41,11 +46,8 @@ class httpUploadDataStream(object):
 		ret = self._dataList[self._readPos]
 		self._readPos += 1
 		if self._progressCallback is not None:
-			self._progressCallback(float(self._readPos / len(self._dataList)))
+			self._progressCallback(float(self._readPos) / len(self._dataList))
 		return ret
-
-	def __getitem__(self, key):
-		return self._dataList[key]
 
 	def __len__(self):
 		return self._totalLength
@@ -57,6 +59,8 @@ class SpectromUpload(object):
 	"""
 	def __init__(self, progressCallback = None):
 		self._hostUrl = '104.236.72.226:8080'
+		#self._hostUrl = '104.236.72.226:80'
+		#self._hostUrl = 'localhost:8080'
 		self._viewUrl = 'www.spectrom3D.com'
 		self._http = None
 		self._hostReachable = True
@@ -84,9 +88,8 @@ class SpectromUpload(object):
 		}
 		res = self._request('POST', '/order', params, files)
 		print res
-		if 'id' in res:
-			return res['id']
-		print res
+		if 'orderId' in res:
+			return res['orderId']
 		return None
 
 	def _request(self, method, url, postData = None, files = None):
@@ -96,9 +99,10 @@ class SpectromUpload(object):
 		error = 'Failed to connect to %s' % self._hostUrl
 		for n in xrange(0, retryCount):
 			if self._http is None:
-				self._http = httpclient.HTTPSConnection(self._hostUrl)
+				self._http = httpclient.HTTPConnection(self._hostUrl)
 			try:
 				if files is not None:
+					print "-------------- PREPARING REQUEST ---------------"
 					boundary = 'wL36Yn8afVp8Ag7AmP8qZ0SA4n1v9T'
 					s = httpUploadDataStream(self._progressCallback)
 					for k, v in files.iteritems():
@@ -114,15 +118,20 @@ class SpectromUpload(object):
 
 					s.write('--%s--\r\n' % (boundary))
 
+					print "------------- SENDING REQUEST ----------------"
 					self._http.request(method, url, s, {"Content-type": "multipart/form-data; boundary=%s" % (boundary), "Content-Length": len(s)})
 				elif postData is not None:
 					self._http.request(method, url, '', {"Content-type": "application/x-www-form-urlencoded"})
 				else:
 					self._http.request(method, url)
-			except IOError:
+			except IOError, e:
+				print e
+				import traceback
+				traceback.print_exc()
 				self._http.close()
 				continue
 			try:
+				print "-------------- WAIT FOR RESPONSE ----------------"
 				response = self._http.getresponse()
 				responseText = response.read()
 			except:

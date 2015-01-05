@@ -66,7 +66,11 @@ class spectromUploadManager(object):
 		wx.CallAfter(self._indicatorWindow.Hide)
 
 		#TODO: link to view orders
-		wx.CallAfter(wx.MessageBox, _("Upload Successful! Order"), _("New design error."), wx.OK)
+		if order is not None:
+			wx.CallAfter(wx.MessageBox, _("Upload Successful!\nYour order identifier is\n") + str(order) , _("File Uploaded."), wx.OK)
+		else:
+			wx.CallAfter(wx.MessageBox, _("Upload Failed! If the problem persists, contact orders@spectrom3d.com"), _("Upload error."), wx.OK | wx.ICON_ERROR)
+
 		#webbrowser.open(self._su.viewUrlForDesign(id))
 
 
@@ -160,10 +164,6 @@ class configureWindow(wx.Frame):
 
 		self._firstName.SetFocus()
 		self._firstName.SelectAll()
-
-	def OnEnterToken(self, e):
-		#self._su.setAuthToken(self._authToken.GetValue())
-		pass
 
 	def OnEnterEmail(self, e):
 		self._emailAddress.SetBackgroundColour(wx.NullColor)
