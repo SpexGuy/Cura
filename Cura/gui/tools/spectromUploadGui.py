@@ -43,18 +43,8 @@ class spectromUploadManager(object):
 		self._indicatorWindow = workingIndicatorWindow(self._mainWindow)
 		self._newDesignWindow = newDesignWindow(self._mainWindow, self, self._su)
 
-		try:
-			licenseInfo = self._su.newLicenseURL()
-			if licenseInfo is not None:
-				termsWindow = termsAndConditionsWindow(self._mainWindow, licenseInfo[0], licenseInfo[1], self.OnLicenseAccepted)
-				termsWindow.Show()
-			else:
-				self.OnLicenseAccepted()
-		except:
-			import traceback
-			traceback.print_exc()
-			wx.MessageBox(_("Couldn't connect to Spectrom.\nIf the problem persists, contact\norders@spectrom3d.com"), _("Can't contact Spectrom"), wx.OK | wx.ICON_ERROR)
-			return
+		self.checkLicense()
+
 
 	def OnLicenseAccepted(self):
 		if self._forceSetup or not profile.getPreference('spectrom_email'):
@@ -68,6 +58,31 @@ class spectromUploadManager(object):
 
 	def _progressCallback(self, progress):
 		self._indicatorWindow.progress(progress)
+
+	def processLicenseInfo(self, licenseInfo):
+		if licenseInfo is not None:
+			termsWindow = termsAndConditionsWindow(self._mainWindow, licenseInfo[0], licenseInfo[1], self.OnLicenseAccepted)
+			termsWindow.Show()
+		else:
+			self.OnLicenseAccepted()
+
+	def checkLicense(self):
+		thread = threading.Thread(target=self.checkLicenseThread)
+		thread.daemon = True
+		thread.start()
+
+	def checkLicenseThread(self):
+		wx.CallAfter(self._indicatorWindow.showBusy, _("Connecting to Spectrom..."))
+		try:
+			licenseInfo = self._su.newLicenseURL()
+			wx.CallAfter(self._indicatorWindow.Hide)
+			wx.CallAfter(self.processLicenseInfo, licenseInfo)
+		except:
+			wx.CallAfter(self._indicatorWindow.Hide)
+			import traceback
+			traceback.print_exc()
+			wx.CallAfter(wx.MessageBox, _("Couldn't connect to Spectrom.\nIf the problem persists, contact\norders@spectrom3d.com"), _("Can't contact Spectrom"), wx.OK | wx.ICON_ERROR)
+			return
 
 	def createNewOrder(self, name):
 		thread = threading.Thread(target=self.createNewOrderThread, args=(name,))
