@@ -8,6 +8,7 @@ import json
 import traceback
 import threading
 import math
+import random
 import sys
 import cStringIO as StringIO
 
@@ -26,6 +27,74 @@ from Cura.gui.util import openglHelpers
 from Cura.gui.util import openglGui
 from Cura.gui.tools import imageToMesh
 from Cura.gui.tools import spectromUploadGui
+from Cura.util.meshLoaders import stl as stlLoader
+
+class OrderWindow(wx.Frame):
+	def __init__(self, parent, price, callback):
+		super(OrderWindow, self).__init__(parent, title='Order this object')
+		self._panel = wx.Panel(self)
+		self.SetSizer(wx.BoxSizer())
+		self.GetSizer().Add(self._panel, 1, wx.EXPAND)
+		self._callback = callback
+		self.abort = False
+
+		self._price = price
+		self._priceText = wx.StaticText(self._panel, -1, "This print costs $%d.00" % (price))
+		self._firstName = wx.TextCtrl(self._panel, -1, _("First Name"))
+		self._lastName = wx.TextCtrl(self._panel, -1, _("Last Name"))
+		self._emailAddress = wx.TextCtrl(self._panel, -1, _("Email"))
+		self._companyName = wx.TextCtrl(self._panel, -1, _("Company (optional)"))
+		self._doneButton = wx.Button(self._panel, -1, _("Place Order"))
+
+		self._panel._sizer = wx.BoxSizer(wx.VERTICAL)
+		self._panel.SetSizer(self._panel._sizer)
+
+		self._panel._sizer.Add(wx.StaticBitmap(self._panel, -1, wx.Bitmap(resources.getPathForImage('spectrom-text.png'))), flag=wx.ALIGN_CENTRE | wx.ALL, border=5)
+		self._panel._sizer.Add(wx.StaticLine(self._panel, -1), flag=wx.EXPAND | wx.ALL)
+		self._panel._sizer.Add(self._priceText, flag=wx.EXPAND | wx.ALL)
+		self._panel._sizer.Add(wx.StaticLine(self._panel, -1), flag=wx.EXPAND | wx.ALL)
+		self._panel._sizer.Add(self._firstName, flag=wx.EXPAND | wx.ALL)
+		self._panel._sizer.Add(self._lastName, flag=wx.EXPAND | wx.ALL)
+		self._panel._sizer.Add(self._emailAddress, flag=wx.EXPAND | wx.ALL)
+		self._panel._sizer.Add(self._companyName, flag=wx.EXPAND | wx.ALL)
+		self._panel._sizer.Add(wx.StaticLine(self._panel, -1), flag=wx.EXPAND | wx.ALL)
+		self._panel._sizer.Add(self._doneButton, flag=wx.EXPAND | wx.ALL)
+
+		self.Bind(wx.EVT_BUTTON, self.OnSubmit, self._doneButton)
+
+		self.Fit()
+		self.Centre()
+
+		self._firstName.SetFocus()
+		self._firstName.SelectAll()
+
+	def OnSubmit(self, e):
+		message = '';
+		first = self._firstName.GetValue().strip()
+		last = self._lastName.GetValue().strip()
+		email = self._emailAddress.GetValue().strip()
+		if not first or ' ' in first:
+			message = 'First name cannot be blank or contain spaces';
+		if not last or ' ' in last:
+			message = 'Last name cannot be blank or contain spaces';
+		if not spectromUploadGui.EMAIL_RE.match(email):
+			message = 'Email is invalid';
+		
+		if message:
+			wx.MessageBox(message, "Error", wx.ICON_ERROR | wx.OK)
+		else:
+			obj = {}
+			obj['price'] = self._price
+			obj['firstname'] = first
+			obj['lastname'] = last
+			obj['email'] = email
+			company = self._companyName.GetValue().strip()
+			if company and company != _("Company (optional)"):
+				obj['companyname'] = company
+			self._callback(obj)
+			self.Hide()
+			self.Destroy()
+
 
 class SelectObjectWindow(wx.Frame):
 	def __init__(self, parent):
@@ -82,16 +151,19 @@ class SelectObjectWindow(wx.Frame):
 
 	def OnSelectCard(self, button):
 		self._sceneView.loadFiles([resources.getPathForMesh('BusinessCardHolder.stl'), resources.getPathForMesh('BusinessCardHolder.layers')])
+		self._sceneView._price = 40
 		self.Hide()
 		self.Destroy()
 
 	def OnSelectVase(self, button):
 		self._sceneView.loadFiles([resources.getPathForMesh('SpiralVase.stl'), resources.getPathForMesh('SpiralVase.layers')])
+		self._sceneView._price = 60
 		self.Hide()
 		self.Destroy()
 
 	def OnSelectDalek(self, button):
 		self._sceneView.loadFiles([resources.getPathForMesh('DalekHoles.stl'), resources.getPathForMesh('DalekHoles.layers')])
+		self._sceneView._price = 80
 		self.Hide()
 		self.Destroy()
 
@@ -182,16 +254,41 @@ class SceneView(openglGui.glGuiPanel):
 		self.updateProfileToControls()
 		self.updateColor()
 
-	def OnSelectObject(self, button):
+	def OnSelectObject(self, button=1):
 		self.OnDeleteAll(None)
 		window = SelectObjectWindow(self)
 		window.Show()
 
 	def OnUploadButton(self, button):
-		colors = StringIO.StringIO()
-		self._saveMetadata(colors)
-		spectromUploadGui.spectromUploadManager(self.GetTopLevelParent(), self._scene, colors.getvalue(), button != 1)
-		colors.close()
+		window = OrderWindow(self, self._price, self.saveOrder)
+		window.Show()
+
+	def saveOrder(self, info):
+		try:
+			randval = 0
+			stlname = ''
+			layername = ''
+			while True:
+				randval = random.getrandbits(64)
+				stlname = 'orders/' + str(randval) + '.stl'
+				layername = 'orders/' + str(randval) + '.layers'
+				if not os.path.exists(stlname):
+					break
+			info['id'] = randval
+			stlfile = open(stlname, 'wb')
+			stlLoader.saveSceneStream(stlfile, self._scene.objects())
+			stlfile.close()
+			self.saveMetadataFile(layername)
+			orderfile = open('orders/orders.json', 'a')
+			json.dump(info, orderfile)
+			orderfile.write(',\n')
+			orderfile.close()
+			wx.MessageBox('Your order has been placed!', "Success", wx.OK)
+			self.OnSelectObject()
+		except:
+			import traceback
+			traceback.print_exc()
+			wx.MessageBox('There was an error placing your order.', "Error", wx.OK | wx.ICON_ERROR)
 
 	def updateColor(self):
 		self._minSelectedLayer = self.layerColors.getMinSelect()
