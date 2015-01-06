@@ -135,13 +135,13 @@ class termsAndConditionsWindow(wx.Frame):
 	def OnCancel(self, e):
 		wx.MessageBox(_('You must accept the terms to use the Spectrom Order Service'), _(''), wx.OK)
 		self.Hide()
-		self.Dispose()
+		self.Destroy()
 
 	def OnAccept(self, e):
 		profile.putPreference('spectrom_terms_version', self._version)
 		self._callback()
 		self.Hide()
-		self.Dispose()
+		self.Destroy()
 
 
 class workingIndicatorWindow(wx.Frame):
@@ -215,7 +215,7 @@ class configureWindow(wx.Frame):
 		self._panel._sizer = wx.GridBagSizer(5, 5)
 		self._panel.SetSizer(self._panel._sizer)
 
-		self._panel._sizer.Add(wx.StaticBitmap(self._panel, -1, wx.Bitmap(getPathForImage('youmagine-text.png'))), (0,0), span=(1,4), flag=wx.ALIGN_CENTRE | wx.ALL, border=5)
+		self._panel._sizer.Add(wx.StaticBitmap(self._panel, -1, wx.Bitmap(getPathForImage('spectrom-text.png'))), (0,0), span=(1,4), flag=wx.ALIGN_CENTRE | wx.ALL, border=5)
 		self._panel._sizer.Add(wx.StaticLine(self._panel, -1), (1,0), span=(1,4), flag=wx.EXPAND | wx.ALL)
 		self._panel._sizer.Add(self._firstName, (2, 1), flag=wx.EXPAND | wx.ALL)
 		self._panel._sizer.Add(self._lastName, (3, 1), flag=wx.EXPAND | wx.ALL)
@@ -268,7 +268,7 @@ class configureWindow(wx.Frame):
 				profile.putPreference('spectrom_companyname', company)
 			self._callback()
 			self.Hide()
-			self.Dispose()
+			self.Destroy()
 
 class newDesignWindow(wx.Frame):
 	def __init__(self, parent, manager, su):
@@ -280,12 +280,12 @@ class newDesignWindow(wx.Frame):
 		self._su = su
 
 		self._designName = wx.TextCtrl(p, -1, _("Design name"))
-		self._shareButton = wx.Button(p, -1, _("Share!"))
+		self._shareButton = wx.Button(p, -1, _("Order"))
 
 		s = wx.GridBagSizer(5, 5)
 		p.SetSizer(s)
 
-		s.Add(wx.StaticBitmap(p, -1, wx.Bitmap(getPathForImage('youmagine-text.png'))), (0,0), span=(1,3), flag=wx.ALIGN_CENTRE | wx.ALL, border=5)
+		s.Add(wx.StaticBitmap(p, -1, wx.Bitmap(getPathForImage('spectrom-text.png'))), (0,0), span=(1,3), flag=wx.ALIGN_CENTRE | wx.ALL, border=5)
 		s.Add(wx.StaticText(p, -1, _("Design name:")), (1, 0), flag=wx.LEFT|wx.TOP, border=5)
 		s.Add(self._designName, (1, 1), span=(1,2), flag=wx.EXPAND|wx.LEFT|wx.TOP|wx.RIGHT, border=5)
 		s.Add(wx.StaticLine(p, -1), (2,0), span=(1,3), flag=wx.EXPAND|wx.ALL)

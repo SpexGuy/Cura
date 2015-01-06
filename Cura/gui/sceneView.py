@@ -20,7 +20,6 @@ from Cura.util import profile
 from Cura.util import meshLoader
 from Cura.util import objectScene
 from Cura.util import resources
-from Cura.util import removableStorage
 from Cura.util import explorer
 from Cura.gui.util import previewTools
 from Cura.gui.util import openglHelpers
@@ -56,7 +55,7 @@ class SceneView(openglGui.glGuiPanel):
 		self.tempMatrix = None
 
 		self.openFileButton = openglGui.glButton(self, 4, _("Load File"), (0,0), self.showLoadFile)
-		self.spectromButton = openglGui.glButton(self, 26, _("Order from Spectrom"), (1,0), self.OnUploadButton)
+		self.spectromButton = openglGui.glButton(self, 20, _("Order from Spectrom"), (1,0), self.OnUploadButton)
 		self.spectromButton.setDisabled(True)
 		self.saveLayersButton = openglGui.glButton(self, 3, _("Save Colors"), (2,0), self.showSaveMetadata)
 		self.saveLayersButton.setDisabled(True)
@@ -332,12 +331,6 @@ class SceneView(openglGui.glGuiPanel):
 		filename = dlg.GetPath()
 		dlg.Destroy()
 		self.saveMetadataFile(filename)
-
-	def _doEjectSD(self, drive):
-		if removableStorage.ejectDrive(drive):
-			self.notification.message('You can now eject the card.')
-		else:
-			self.notification.message('Safe remove failed...')
 
 	def OnToolSelect(self, button):
 		if self.rotateToolButton.getSelected():
