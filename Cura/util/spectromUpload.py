@@ -7,7 +7,12 @@ __copyright__ = "Copyright (C) 2015 Spectrom - Released under terms of the AGPLv
 import json
 import httplib as httpclient
 import urllib
+import urllib2
 import textwrap
+try:
+	from xml.etree import cElementTree as ElementTree
+except:
+	from xml.etree import ElementTree
 
 from Cura.util import profile
 from Cura.util.meshLoaders import stl
@@ -58,13 +63,41 @@ class SpectromUpload(object):
 	These functions are blocking and thus this class should be used from a thread.
 	"""
 	def __init__(self, progressCallback = None):
-		self._hostUrl = '104.236.72.226:8080'
-		#self._hostUrl = '104.236.72.226:80'
+		self._hostUrl = 'orders.spectrom3d.com:8080'
 		#self._hostUrl = 'localhost:8080'
 		self._viewUrl = 'www.spectrom3D.com'
 		self._http = None
 		self._hostReachable = True
 		self._progressCallback = progressCallback
+
+	def newLicenseURL(self):
+		latestXml = 'Not yet read'
+		try:
+			licenseBaseURL = 'http://spectrom3d.com/license'
+			localVersion = map(int, profile.getPreference('spectrom_terms_version').split('.'))
+			while len(localVersion) < 3:
+				localVersion += [0]
+			latestFile = urllib2.urlopen("%s/version.xml" % (licenseBaseURL))
+			latestXml = latestFile.read()
+			latestFile.close()
+			xmlTree = ElementTree.fromstring(latestXml)
+			for license in xmlTree.iter('license'):
+				service = str(license.attrib['name'])
+				if service == 'UploadService':
+					version = [int(license.attrib['major']), int(license.attrib['minor']), int(license.attrib['revision'])]
+					if version > localVersion:
+						filename = license.find('filename').text
+						return ('%s/%s' % (licenseBaseURL, filename), '.'.join(map(str, version)))
+					else:
+						return None
+		except:
+			print 'License Check Failed'
+			import traceback
+			traceback.print_exc()
+			raise
+		print 'License Check got xml, but no UploadService?'
+		print latestXml
+		raise Exception, 'No Upload Service in xml?'
 
 	def isHostReachable(self):
 		return self._hostReachable

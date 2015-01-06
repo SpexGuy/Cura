@@ -7,6 +7,7 @@ import re
 import os
 import types
 import webbrowser
+import urllib2
 import cStringIO as StringIO
 
 from Cura.util import profile
@@ -32,24 +33,37 @@ def getClipboardText():
 		return ret
 
 class spectromUploadManager(object):
-	def __init__(self, parent, objectScene, colors="OH NOES! I FORGETS THE COLORS! OPPS!"):
+	def __init__(self, parent, objectScene, colors, forceSetup=False):
 		self._mainWindow = parent
 		self._scene = objectScene
 		self._su = spectromUpload.SpectromUpload(self._progressCallback)
-		self._colorString = colors;
+		self._colorString = colors
+		self._forceSetup = forceSetup
 
 		self._indicatorWindow = workingIndicatorWindow(self._mainWindow)
 		self._newDesignWindow = newDesignWindow(self._mainWindow, self, self._su)
 
-		if not profile.getPreference('spectrom_email'):
+		try:
+			licenseInfo = self._su.newLicenseURL()
+			if licenseInfo is not None:
+				termsWindow = termsAndConditionsWindow(self._mainWindow, licenseInfo[0], licenseInfo[1], self.OnLicenseAccepted)
+				termsWindow.Show()
+			else:
+				self.OnLicenseAccepted()
+		except:
+			import traceback
+			traceback.print_exc()
+			wx.MessageBox(_("Couldn't connect to Spectrom.\nIf the problem persists, contact\norders@spectrom3d.com"), _("Can't contact Spectrom"), wx.OK | wx.ICON_ERROR)
+			return
+
+	def OnLicenseAccepted(self):
+		if self._forceSetup or not profile.getPreference('spectrom_email'):
 			self._configWindow = configureWindow(self._mainWindow, self.OnEmailEntered)
 			self._configWindow.Show()
 		else:
 			self._newDesignWindow.Show()
 
 	def OnEmailEntered(self):
-		self._configWindow.Hide()
-		self._configWindow.Destroy()
 		self._newDesignWindow.Show()
 
 	def _progressCallback(self, progress):
@@ -72,6 +86,47 @@ class spectromUploadManager(object):
 			wx.CallAfter(wx.MessageBox, _("Upload Failed! If the problem persists, contact orders@spectrom3d.com"), _("Upload error."), wx.OK | wx.ICON_ERROR)
 
 		#webbrowser.open(self._su.viewUrlForDesign(id))
+
+class termsAndConditionsWindow(wx.Frame):
+	def __init__(self, parent, termsUrl, termsVersion, callback):
+		super(termsAndConditionsWindow, self).__init__(parent, title='End User License Agreement - Version %s' % (termsVersion), style=wx.FRAME_TOOL_WINDOW|wx.FRAME_FLOAT_ON_PARENT|wx.FRAME_NO_TASKBAR|wx.CAPTION)
+		self._callback = callback
+		self._version = termsVersion
+		licenseFile = urllib2.urlopen(termsUrl)
+		licenseText = licenseFile.read()
+		licenseFile.close()
+
+		panel = wx.Panel(self, wx.ID_ANY)
+		terms = wx.TextCtrl(panel, wx.ID_ANY, size=(300,100), style = wx.TE_MULTILINE | wx.TE_READONLY | wx.HSCROLL)
+		buttonPanel = wx.Panel(panel, wx.ID_ANY)
+		acceptButton = wx.Button(buttonPanel, wx.ID_ANY, 'Accept')
+		cancelButton = wx.Button(buttonPanel, wx.ID_ANY, 'Cancel')
+
+		self.Bind(wx.EVT_BUTTON, self.OnAccept, acceptButton)
+		self.Bind(wx.EVT_BUTTON, self.OnCancel, cancelButton)
+
+		sizer = wx.BoxSizer(wx.HORIZONTAL)
+		sizer.Add(cancelButton, 1, wx.ALL | wx.RIGHT, 5)
+		sizer.Add(acceptButton, 1, wx.ALL | wx.RIGHT, 5)
+		buttonPanel.SetSizer(sizer)
+
+		sizer = wx.BoxSizer(wx.VERTICAL)
+		sizer.Add(terms, 1, wx.ALL | wx.EXPAND, 5)
+		sizer.Add(buttonPanel, 0, wx.ALL | wx.EXPAND, 0)
+		panel.SetSizer(sizer)
+
+		terms.SetValue(licenseText)
+
+	def OnCancel(self, e):
+		wx.MessageBox(_('You must accept the terms to use the Spectrom Order Service'), _(''), wx.OK)
+		self.Hide()
+		self.Dispose()
+
+	def OnAccept(self, e):
+		profile.putPreference('spectrom_terms_version', self._version)
+		self._callback()
+		self.Hide()
+		self.Dispose()
 
 
 class workingIndicatorWindow(wx.Frame):
@@ -197,6 +252,8 @@ class configureWindow(wx.Frame):
 			if company != _("Company (optional)"):
 				profile.putPreference('spectrom_companyname', company)
 			self._callback()
+			self.Hide()
+			self.Dispose()
 
 class newDesignWindow(wx.Frame):
 	def __init__(self, parent, manager, su):

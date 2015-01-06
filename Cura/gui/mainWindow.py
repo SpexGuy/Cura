@@ -10,6 +10,7 @@ from Cura.gui import sceneView
 from Cura.gui import aboutWindow
 from Cura.gui.util import dropTarget
 from Cura.gui.tools import minecraftImport
+from Cura.gui.tools import spectromUploadGui
 from Cura.util import profile
 from Cura.util import version
 import platform
@@ -69,6 +70,9 @@ class mainWindow(wx.Frame):
 			i = self.fileMenu.Append(-1, _("Minecraft map import..."))
 			self.Bind(wx.EVT_MENU, self.OnMinecraftImport, i)
 
+		self.fileMenu.AppendSeparator()
+		i = self.fileMenu.Append(-1, _("Configure Spectrom Profile"))
+		self.Bind(wx.EVT_MENU, self.OnConfigSpectrom, i)
 		self.fileMenu.AppendSeparator()
 		i = self.fileMenu.Append(wx.ID_EXIT, _("Quit"))
 		self.Bind(wx.EVT_MENU, self.OnQuit, i)
@@ -203,6 +207,9 @@ class mainWindow(wx.Frame):
 		except:
 			print "Unable to read from clipboard"
 
+	def OnConfigSpectrom(self, e):
+		configWindow = spectromUploadGui.configureWindow(self, lambda: None)
+		configWindow.Show()
 
 	def OnDropFiles(self, files):
 		if len(files) > 0:

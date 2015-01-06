@@ -489,6 +489,7 @@ setting('window_width', '-1', float, 'preference', 'hidden')
 setting('window_height', '-1', float, 'preference', 'hidden')
 setting('last_run_version', '', str, 'preference', 'hidden')
 
+setting('spectrom_terms_version', '0.0.0', str, 'preference', 'hidden')
 setting('spectrom_firstname', '', str, 'preference', 'hidden')
 setting('spectrom_lastname', '', str, 'preference', 'hidden')
 setting('spectrom_email', '', str, 'preference', 'hidden')

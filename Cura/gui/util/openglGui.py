@@ -446,6 +446,9 @@ class glButton(glGuiControl):
 	def setDisabled(self, value):
 		self._disabled = value
 
+	def isDisabled(self):
+		return self._disabled
+
 	def setProgressBar(self, value):
 		self._progressBar = value
 
@@ -1286,6 +1289,9 @@ class glRangeSelect(glGuiControl):
 
 	def hasSelected(self):
 		return self._baseSelect != self._endSelect
+
+	def deselectAll(self):
+		self._baseSelect = self._endSelect
 
 	def setHidden(self, value):
 		self._hidden = value

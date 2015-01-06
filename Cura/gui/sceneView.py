@@ -4,6 +4,7 @@ import wx
 import numpy
 import time
 import os
+import json
 import traceback
 import threading
 import math
@@ -54,7 +55,11 @@ class SceneView(openglGui.glGuiPanel):
 		self._projMatrix = None
 		self.tempMatrix = None
 
-		self.openFileButton      = openglGui.glButton(self, 4, _("Load"), (0,0), self.showLoadModel)
+		self.openFileButton = openglGui.glButton(self, 4, _("Load File"), (0,0), self.showLoadFile)
+		self.spectromButton = openglGui.glButton(self, 26, _("Order from Spectrom"), (1,0), self.OnUploadButton)
+		self.spectromButton.setDisabled(True)
+		self.saveLayersButton = openglGui.glButton(self, 3, _("Save Colors"), (2,0), self.showSaveMetadata)
+		self.saveLayersButton.setDisabled(True)
 
 		group = []
 		self.rotateToolButton = openglGui.glRadioButton(self, 8, _("Rotate"), (0,-1), group, self.OnToolSelect)
@@ -95,9 +100,6 @@ class SceneView(openglGui.glGuiPanel):
 		self.layerColors = openglGui.glColorRangeSelect(self, (-1.5, -3), 0, 1950, (1,1,1), lambda: self.updateColor())
 		self.layerColorer = openglGui.glColorPicker(self, (-2, -5.4), (1,1,1), lambda: self.layerColors.setColor(self.layerColorer.getColor()))
 
-		self.spectromButton = openglGui.glButton(self, 26, _("Upload to Spectrom"), (1,0), lambda button: spectromUploadGui.spectromUploadManager(self.GetTopLevelParent(), self._scene))
-		self.spectromButton.setDisabled(True)
-
 		self.notification = openglGui.glNotification(self, (0, 0))
 
 		self.Bind(wx.EVT_MOUSEWHEEL, self.OnMouseWheel)
@@ -110,14 +112,109 @@ class SceneView(openglGui.glGuiPanel):
 		self.updateProfileToControls()
 		self.updateColor()
 
+	def OnUploadButton(self, button):
+		colors = StringIO.StringIO()
+		self._saveMetadata(colors)
+		spectromUploadGui.spectromUploadManager(self.GetTopLevelParent(), self._scene, colors.getvalue(), button != 1)
+		colors.close()
+
 	def updateColor(self):
 		self._minSelectedLayer = self.layerColors.getMinSelect()
 		self._maxSelectedLayer = self.layerColors.getMaxSelect()
 		self._colorLayers = self.layerColors.getLayers()
 		self._colorColors = self.layerColors.getColors()
 
+	def saveMetadataFile(self, filename):
+		f = open(filename, 'w')
+		self._saveMetadata(f)
+		f.close()
+
+	def _saveMetadata(self, stream):
+		obj = { \
+			"colors": self._colorColors, \
+			"layers": self._colorLayers \
+		}
+		json.dump(obj, stream)
+
+	def loadMetadataFile(self, filename):
+		f = open(filename, 'r')
+		self._loadMetadata(f)
+		f.close()
+
+	def _loadMetadata(self, stream):
+		if len(self._scene.objects()) == 0:
+			self.notification.message("Please load a model before applying colors")
+			return
+		message = ''
+		obj = "Couldn't parse JSON"
+		try:
+			obj = json.load(stream)
+			if not 'colors' in obj:
+				print "Load Error: No colors"
+				raise ValueError
+			if not 'layers' in obj:
+				print "Load Error: No layers"
+				raise ValueError
+			colors = obj['colors']
+			layers = obj['layers']
+			# validate types
+			if not isinstance(colors, list):
+				print "Load Error: Colors is not a list"
+				raise ValueError
+			if not isinstance(layers, list):
+				print "Load Error: Layers is not a list"
+				raise ValueError
+			# validate lengths
+			if len(colors) != len(layers):
+				print "Load Error: Layers and Colors are different sizes"
+				raise ValueError
+			if len(colors) < 1:
+				print "Load Error: Layers and Colors lists are empty"
+				raise ValueError
+			# validate values
+			for n in xrange(len(layers)-1):
+				if layers[n] >= layers[n+1]:
+					print "Load Error: layers[%d] is out of order" % (n+1)
+					raise ValueError
+			if layers[0] <= 0:
+				print "Load Error: nonpositive layers"
+				raise ValueError
+			for n in xrange(len(colors)):
+				if not isinstance(colors[n], list):
+					print "Load Error: colors[%d] is not a list" % (n)
+					raise ValueError
+				if len(colors[n]) != 3:
+					print "Load Error: colors[%d] has the wrong length" % (n)
+					raise ValueError
+
+			# Implant new colors
+			# TODO: This is a hack
+			self.layerColors.deselectAll()
+			# get number of layers
+			numLayers = layers[-1]
+			trueLayers = self.layerColors._maxValue
+			# set up rangeSelect as if it contained loaded data
+			self.layerColors._maxValue = numLayers
+			self.layerColors._colors = colors
+			self.layerColors._layers = layers
+			# scale data to fit loaded models
+			if numLayers != trueLayers:
+				print "Warning: Layer profile has different number of layers. Scaled."
+				message = "Warning: Layer profile has different size. Scaled to fit."
+				self.layerColors.setRange(0, trueLayers)
+
+			self.updateColor()
+		except ValueError:
+			print "Offending data:"
+			print obj
+			message = "Couldn't load data. Check log for details."
+
+		if message:
+			self.notification.message(message)
+
 	def loadSceneFiles(self, filenames):
 		self.spectromButton.setDisabled(False)
+		self.saveLayersButton.setDisabled(False)
 		self.loadScene(filenames)
 
 	def loadFiles(self, filenames):
@@ -126,12 +223,12 @@ class SceneView(openglGui.glGuiPanel):
 		# so if single gcode file, process this
 		# otherwise ignore all gcode files
 		gcodeFilename = None
+		spectromFilename = None
 		if len(filenames) == 1:
 			filename = filenames[0]
 			ext = os.path.splitext(filename)[1].lower()
 			if ext == '.g' or ext == '.gcode':
 				gcodeFilename = filename
-				mainWindow.addToModelMRU(filename)
 		if gcodeFilename is not None:
 			self.notification.message("Spectrom does not yet support pre-sliced G-Code files.")
 		else:
@@ -151,6 +248,11 @@ class SceneView(openglGui.glGuiPanel):
 					if ext in meshLoader.loadSupportedExtensions() or ext in imageToMesh.supportedExtensions():
 						scene_filenames.append(filename)
 						mainWindow.addToModelMRU(filename)
+					elif ext == '.layers' or ext == '.layerspec':
+						if spectromFilename is not None:
+							ignored_types[filename] = 1
+						else:
+							spectromFilename = filename
 					else:
 						ignored_types[ext] = 1
 			if ignored_types:
@@ -166,6 +268,8 @@ class SceneView(openglGui.glGuiPanel):
 				newZoom = numpy.max(self._machineSize)
 				self._animView = openglGui.animation(self, self._viewTarget.copy(), numpy.array([0,0,0], numpy.float32), 0.5)
 				self._animZoom = openglGui.animation(self, self._zoom, newZoom, 0.5)
+			if spectromFilename is not None:
+				self.loadMetadataFile(spectromFilename)
 
 	def reloadScene(self, e):
 		# Copy the list before DeleteAll clears it
@@ -175,16 +279,18 @@ class SceneView(openglGui.glGuiPanel):
 		self.OnDeleteAll(None)
 		self.loadScene(fileList)
 
-	def showLoadModel(self, button = 1):
+	def showLoadFile(self, button = 1):
 		if button == 1:
 			dlg=wx.FileDialog(self, _("Open 3D model"), os.path.split(profile.getPreference('lastFile'))[0], style=wx.FD_OPEN|wx.FD_FILE_MUST_EXIST|wx.FD_MULTIPLE)
 
-			wildcardList = ';'.join(map(lambda s: '*' + s, meshLoader.loadSupportedExtensions() + imageToMesh.supportedExtensions()))
+			wildcardList = ';'.join(map(lambda s: '*' + s, meshLoader.loadSupportedExtensions() + imageToMesh.supportedExtensions() + ['.layers', '.layerspec']))
 			wildcardFilter = "All (%s)|%s;%s" % (wildcardList, wildcardList, wildcardList.upper())
 			wildcardList = ';'.join(map(lambda s: '*' + s, meshLoader.loadSupportedExtensions()))
 			wildcardFilter += "|Mesh files (%s)|%s;%s" % (wildcardList, wildcardList, wildcardList.upper())
 			wildcardList = ';'.join(map(lambda s: '*' + s, imageToMesh.supportedExtensions()))
 			wildcardFilter += "|Image files (%s)|%s;%s" % (wildcardList, wildcardList, wildcardList.upper())
+			wildcardList = '*.layers;*.layerspec'
+			wildcardFilter += "|Layer files (%s)|%s;%s" % (wildcardList, wildcardList, wildcardList.upper())
 
 			dlg.SetWildcard(wildcardFilter)
 			if dlg.ShowModal() != wx.ID_OK:
@@ -197,7 +303,7 @@ class SceneView(openglGui.glGuiPanel):
 			profile.putPreference('lastFile', filenames[0])
 			self.loadFiles(filenames)
 
-	def showSaveModel(self):
+	def showSaveModel(self, button = 1):
 		if len(self._scene.objects()) < 1:
 			return
 		dlg=wx.FileDialog(self, _("Save 3D model"), os.path.split(profile.getPreference('lastFile'))[0], style=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT)
@@ -211,6 +317,21 @@ class SceneView(openglGui.glGuiPanel):
 		filename = dlg.GetPath()
 		dlg.Destroy()
 		meshLoader.saveMeshes(filename, self._scene.objects())
+
+	def showSaveMetadata(self, button = 1):
+		if len(self._scene.objects()) < 1:
+			return
+		dlg=wx.FileDialog(self, _("Save Layer Profile"), os.path.split(profile.getPreference('lastFile'))[0], style=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT)
+		fileExtensions = ['.layers']
+		wildcardList = ';'.join(map(lambda s: '*' + s, fileExtensions))
+		wildcardFilter = "Spectrom layer files (%s)|%s;%s" % (wildcardList, wildcardList, wildcardList.upper())
+		dlg.SetWildcard(wildcardFilter)
+		if dlg.ShowModal() != wx.ID_OK:
+			dlg.Destroy()
+			return
+		filename = dlg.GetPath()
+		dlg.Destroy()
+		self.saveMetadataFile(filename)
 
 	def _doEjectSD(self, drive):
 		if removableStorage.ejectDrive(drive):
@@ -395,6 +516,10 @@ class SceneView(openglGui.glGuiPanel):
 		self._scene.updateSizeOffsets()
 		self.updateLayerRange()
 		self.QueueRefresh()
+		if len(self._scene.objects()) == 0:
+			self.spectromButton.setDisabled(True)
+			self.saveLayersButton.setDisabled(True)
+
 
 	def loadScene(self, fileList):
 		for filename in fileList:
