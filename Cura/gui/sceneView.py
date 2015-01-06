@@ -27,6 +27,75 @@ from Cura.gui.util import openglGui
 from Cura.gui.tools import imageToMesh
 from Cura.gui.tools import spectromUploadGui
 
+class SelectObjectWindow(wx.Frame):
+	def __init__(self, parent):
+		super(SelectObjectWindow, self).__init__(parent, title="Select an object", style=wx.FRAME_TOOL_WINDOW|wx.FRAME_FLOAT_ON_PARENT|wx.FRAME_NO_TASKBAR)
+		self._sceneView = parent
+		self._panel = wx.Panel(self)
+		self.SetSizer(wx.BoxSizer())
+		self.GetSizer().Add(self._panel, 1, wx.EXPAND)
+
+		title = wx.StaticText(self._panel, -1, _('Select an object to color'))
+		title.SetFont(wx.Font(30, wx.SWISS, wx.NORMAL, wx.BOLD))
+
+		cardImage = wx.StaticBitmap(self._panel, -1, wx.Bitmap(resources.getPathForImage('BusinessCardHolder.jpg')))
+		cardButton = wx.Button(self._panel, -1, _("Color your work!"))
+		cardText = wx.StaticText(self._panel, -1, _('Business Card Holder\nCreated by rhmorrison\nhttp://www.thingiverse.com/thing:28826'))
+		self.Bind(wx.EVT_BUTTON, self.OnSelectCard, cardButton)
+		cardButton.SetFont(wx.Font(20, wx.SWISS, wx.NORMAL, wx.NORMAL))
+		cardText.SetFont(wx.Font(15, wx.SWISS, wx.NORMAL, wx.NORMAL))
+
+		vaseImage = wx.StaticBitmap(self._panel, -1, wx.Bitmap(resources.getPathForImage('SpiralVase.jpg')))
+		vaseButton = wx.Button(self._panel, -1, _("Color your life!"))
+		vaseText = wx.StaticText(self._panel, -1, _('Spiral Vase\nCreated by anoved\nhttp://www.thingiverse.com/thing:275932'))
+		self.Bind(wx.EVT_BUTTON, self.OnSelectVase, vaseButton)
+		vaseButton.SetFont(wx.Font(20, wx.SWISS, wx.NORMAL, wx.NORMAL))
+		vaseText.SetFont(wx.Font(15, wx.SWISS, wx.NORMAL, wx.NORMAL))
+
+		dalekImage = wx.StaticBitmap(self._panel, -1, wx.Bitmap(resources.getPathForImage('DalekHoles.jpg')))
+		dalekButton = wx.Button(self._panel, -1, _("EXTERMINATE!"))
+		dalekText = wx.StaticText(self._panel, -1, _('Dalek\nCreated by RevK\nhttp://www.thingiverse.com/thing:192937'))
+		self.Bind(wx.EVT_BUTTON, self.OnSelectDalek, dalekButton)
+		dalekButton.SetFont(wx.Font(20, wx.SWISS, wx.NORMAL, wx.NORMAL))
+		dalekText.SetFont(wx.Font(15, wx.SWISS, wx.NORMAL, wx.NORMAL))
+
+		sizer = wx.GridBagSizer(4,3)
+		sizer.Add(title, (0,0), span=(1,3), flag=wx.ALIGN_CENTRE | wx.ALL, border=5)
+
+		sizer.Add(cardImage, (1,0), flag=wx.ALIGN_CENTRE | wx.ALL, border=5)
+		sizer.Add(cardButton, (2,0), flag=wx.ALIGN_CENTRE | wx.EXPAND | wx.ALL, border=5)
+		sizer.Add(cardText, (3,0), flag=wx.ALIGN_CENTRE | wx.ALL, border=5)
+
+		sizer.Add(vaseImage, (1,1), flag=wx.ALIGN_CENTRE | wx.ALL, border=5)
+		sizer.Add(vaseButton, (2,1), flag=wx.ALIGN_CENTRE | wx.EXPAND | wx.ALL, border=5)
+		sizer.Add(vaseText, (3,1), flag=wx.ALIGN_CENTRE | wx.ALL, border=5)
+
+		sizer.Add(dalekImage, (1,2), flag=wx.ALIGN_CENTRE | wx.ALL, border=5)
+		sizer.Add(dalekButton, (2,2), flag=wx.ALIGN_CENTRE | wx.EXPAND | wx.ALL, border=5)
+		sizer.Add(dalekText, (3,2), flag=wx.ALIGN_CENTRE | wx.ALL, border=5)
+
+		self._panel.SetSizer(sizer)
+
+		self.Fit()
+		self.Centre()
+
+
+	def OnSelectCard(self, button):
+		self._sceneView.loadFiles([resources.getPathForMesh('BusinessCardHolder.stl'), resources.getPathForMesh('BusinessCardHolder.layers')])
+		self.Hide()
+		self.Destroy()
+
+	def OnSelectVase(self, button):
+		self._sceneView.loadFiles([resources.getPathForMesh('SpiralVase.stl'), resources.getPathForMesh('SpiralVase.layers')])
+		self.Hide()
+		self.Destroy()
+
+	def OnSelectDalek(self, button):
+		self._sceneView.loadFiles([resources.getPathForMesh('DalekHoles.stl'), resources.getPathForMesh('DalekHoles.layers')])
+		self.Hide()
+		self.Destroy()
+
+
 class SceneView(openglGui.glGuiPanel):
 	def __init__(self, parent):
 		super(SceneView, self).__init__(parent)
@@ -54,50 +123,52 @@ class SceneView(openglGui.glGuiPanel):
 		self._projMatrix = None
 		self.tempMatrix = None
 
-		self.openFileButton = openglGui.glButton(self, 4, _("Load File"), (0,0), self.showLoadFile)
-		self.spectromButton = openglGui.glButton(self, 20, _("Order from Spectrom"), (1,0), self.OnUploadButton)
+		self.openFileButton = openglGui.glButton(self, 4, _("Load Object"), (0.5,0.15), self.OnSelectObject)
+		self.openFileButton.setForceText(True)
+		self.spectromButton = openglGui.glButton(self, 20, _("Order This Object"), (-1.5,0.15), self.OnUploadButton)
 		self.spectromButton.setDisabled(True)
-		self.saveLayersButton = openglGui.glButton(self, 3, _("Save Colors"), (2,0), self.showSaveMetadata)
-		self.saveLayersButton.setDisabled(True)
+		self.spectromButton.setForceText(True)
+#		self.saveLayersButton = openglGui.glButton(self, 3, _("Save Colors"), (2,0), self.showSaveMetadata)
+#		self.saveLayersButton.setDisabled(True)
 
-		group = []
-		self.rotateToolButton = openglGui.glRadioButton(self, 8, _("Rotate"), (0,-1), group, self.OnToolSelect)
-		self.scaleToolButton  = openglGui.glRadioButton(self, 9, _("Scale"), (1,-1), group, self.OnToolSelect)
-		self.mirrorToolButton  = openglGui.glRadioButton(self, 10, _("Mirror"), (2,-1), group, self.OnToolSelect)
+#		group = []
+#		self.rotateToolButton = openglGui.glRadioButton(self, 8, _("Rotate"), (0,-1), group, self.OnToolSelect)
+#		self.scaleToolButton  = openglGui.glRadioButton(self, 9, _("Scale"), (1,-1), group, self.OnToolSelect)
+#		self.mirrorToolButton  = openglGui.glRadioButton(self, 10, _("Mirror"), (2,-1), group, self.OnToolSelect)
+#
+#		self.resetRotationButton = openglGui.glButton(self, 12, _("Reset"), (0,-2), self.OnRotateReset)
+#		self.layFlatButton       = openglGui.glButton(self, 16, _("Lay flat"), (0,-3), self.OnLayFlat)
+#
+#		self.resetScaleButton    = openglGui.glButton(self, 13, _("Reset"), (1,-2), self.OnScaleReset)
+#		self.scaleMaxButton      = openglGui.glButton(self, 17, _("To max"), (1,-3), self.OnScaleMax)
+#
+#		self.mirrorXButton       = openglGui.glButton(self, 14, _("Mirror X"), (2,-2), lambda button: self.OnMirror(0))
+#		self.mirrorYButton       = openglGui.glButton(self, 18, _("Mirror Y"), (2,-3), lambda button: self.OnMirror(1))
+#		self.mirrorZButton       = openglGui.glButton(self, 22, _("Mirror Z"), (2,-4), lambda button: self.OnMirror(2))
+#
+#		self.rotateToolButton.setExpandArrow(True)
+#		self.scaleToolButton.setExpandArrow(True)
+#		self.mirrorToolButton.setExpandArrow(True)
+#
+#		self.scaleForm = openglGui.glFrame(self, (2, -2))
+#		openglGui.glGuiLayoutGrid(self.scaleForm)
+#		openglGui.glLabel(self.scaleForm, _("Scale X"), (0,0))
+#		self.scaleXctrl = openglGui.glNumberCtrl(self.scaleForm, '1.0', (1,0), lambda value: self.OnScaleEntry(value, 0))
+#		openglGui.glLabel(self.scaleForm, _("Scale Y"), (0,1))
+#		self.scaleYctrl = openglGui.glNumberCtrl(self.scaleForm, '1.0', (1,1), lambda value: self.OnScaleEntry(value, 1))
+#		openglGui.glLabel(self.scaleForm, _("Scale Z"), (0,2))
+#		self.scaleZctrl = openglGui.glNumberCtrl(self.scaleForm, '1.0', (1,2), lambda value: self.OnScaleEntry(value, 2))
+#		openglGui.glLabel(self.scaleForm, _("Size X (mm)"), (0,4))
+#		self.scaleXmmctrl = openglGui.glNumberCtrl(self.scaleForm, '0.0', (1,4), lambda value: self.OnScaleEntryMM(value, 0))
+#		openglGui.glLabel(self.scaleForm, _("Size Y (mm)"), (0,5))
+#		self.scaleYmmctrl = openglGui.glNumberCtrl(self.scaleForm, '0.0', (1,5), lambda value: self.OnScaleEntryMM(value, 1))
+#		openglGui.glLabel(self.scaleForm, _("Size Z (mm)"), (0,6))
+#		self.scaleZmmctrl = openglGui.glNumberCtrl(self.scaleForm, '0.0', (1,6), lambda value: self.OnScaleEntryMM(value, 2))
+#		openglGui.glLabel(self.scaleForm, _("Uniform scale"), (0,8))
+#		self.scaleUniform = openglGui.glCheckbox(self.scaleForm, True, (1,8), None)
 
-		self.resetRotationButton = openglGui.glButton(self, 12, _("Reset"), (0,-2), self.OnRotateReset)
-		self.layFlatButton       = openglGui.glButton(self, 16, _("Lay flat"), (0,-3), self.OnLayFlat)
-
-		self.resetScaleButton    = openglGui.glButton(self, 13, _("Reset"), (1,-2), self.OnScaleReset)
-		self.scaleMaxButton      = openglGui.glButton(self, 17, _("To max"), (1,-3), self.OnScaleMax)
-
-		self.mirrorXButton       = openglGui.glButton(self, 14, _("Mirror X"), (2,-2), lambda button: self.OnMirror(0))
-		self.mirrorYButton       = openglGui.glButton(self, 18, _("Mirror Y"), (2,-3), lambda button: self.OnMirror(1))
-		self.mirrorZButton       = openglGui.glButton(self, 22, _("Mirror Z"), (2,-4), lambda button: self.OnMirror(2))
-
-		self.rotateToolButton.setExpandArrow(True)
-		self.scaleToolButton.setExpandArrow(True)
-		self.mirrorToolButton.setExpandArrow(True)
-
-		self.scaleForm = openglGui.glFrame(self, (2, -2))
-		openglGui.glGuiLayoutGrid(self.scaleForm)
-		openglGui.glLabel(self.scaleForm, _("Scale X"), (0,0))
-		self.scaleXctrl = openglGui.glNumberCtrl(self.scaleForm, '1.0', (1,0), lambda value: self.OnScaleEntry(value, 0))
-		openglGui.glLabel(self.scaleForm, _("Scale Y"), (0,1))
-		self.scaleYctrl = openglGui.glNumberCtrl(self.scaleForm, '1.0', (1,1), lambda value: self.OnScaleEntry(value, 1))
-		openglGui.glLabel(self.scaleForm, _("Scale Z"), (0,2))
-		self.scaleZctrl = openglGui.glNumberCtrl(self.scaleForm, '1.0', (1,2), lambda value: self.OnScaleEntry(value, 2))
-		openglGui.glLabel(self.scaleForm, _("Size X (mm)"), (0,4))
-		self.scaleXmmctrl = openglGui.glNumberCtrl(self.scaleForm, '0.0', (1,4), lambda value: self.OnScaleEntryMM(value, 0))
-		openglGui.glLabel(self.scaleForm, _("Size Y (mm)"), (0,5))
-		self.scaleYmmctrl = openglGui.glNumberCtrl(self.scaleForm, '0.0', (1,5), lambda value: self.OnScaleEntryMM(value, 1))
-		openglGui.glLabel(self.scaleForm, _("Size Z (mm)"), (0,6))
-		self.scaleZmmctrl = openglGui.glNumberCtrl(self.scaleForm, '0.0', (1,6), lambda value: self.OnScaleEntryMM(value, 2))
-		openglGui.glLabel(self.scaleForm, _("Uniform scale"), (0,8))
-		self.scaleUniform = openglGui.glCheckbox(self.scaleForm, True, (1,8), None)
-
-		self.layerColors = openglGui.glColorRangeSelect(self, (-1.5, -3), 0, 1950, (1,1,1), lambda: self.updateColor())
-		self.layerColorer = openglGui.glColorPicker(self, (-2, -5.4), (1,1,1), lambda: self.layerColors.setColor(self.layerColorer.getColor()))
+		self.layerColors = openglGui.glColorRangeSelect(self, (-0.5, -0.6), 0, 1950, (1,1,1), lambda: self.updateColor())
+		self.layerColorer = openglGui.glColorPicker(self, (0, -3.7), (1,1,1), lambda: self.layerColors.setColor(self.layerColorer.getColor()))
 
 		self.notification = openglGui.glNotification(self, (0, 0))
 
@@ -110,6 +181,11 @@ class SceneView(openglGui.glGuiPanel):
 		self.updateToolButtons()
 		self.updateProfileToControls()
 		self.updateColor()
+
+	def OnSelectObject(self, button):
+		self.OnDeleteAll(None)
+		window = SelectObjectWindow(self)
+		window.Show()
 
 	def OnUploadButton(self, button):
 		colors = StringIO.StringIO()
@@ -213,7 +289,7 @@ class SceneView(openglGui.glGuiPanel):
 
 	def loadSceneFiles(self, filenames):
 		self.spectromButton.setDisabled(False)
-		self.saveLayersButton.setDisabled(False)
+#		self.saveLayersButton.setDisabled(False)
 		self.loadScene(filenames)
 
 	def loadFiles(self, filenames):
@@ -333,36 +409,37 @@ class SceneView(openglGui.glGuiPanel):
 		self.saveMetadataFile(filename)
 
 	def OnToolSelect(self, button):
-		if self.rotateToolButton.getSelected():
-			self.tool = previewTools.toolRotate(self)
-		elif self.scaleToolButton.getSelected():
-			self.tool = previewTools.toolScale(self)
-		elif self.mirrorToolButton.getSelected():
-			self.tool = previewTools.toolNone(self)
-		else:
-			self.tool = previewTools.toolNone(self)
-		self.resetRotationButton.setHidden(not self.rotateToolButton.getSelected())
-		self.layFlatButton.setHidden(not self.rotateToolButton.getSelected())
-		self.resetScaleButton.setHidden(not self.scaleToolButton.getSelected())
-		self.scaleMaxButton.setHidden(not self.scaleToolButton.getSelected())
-		self.scaleForm.setHidden(not self.scaleToolButton.getSelected())
-		self.mirrorXButton.setHidden(not self.mirrorToolButton.getSelected())
-		self.mirrorYButton.setHidden(not self.mirrorToolButton.getSelected())
-		self.mirrorZButton.setHidden(not self.mirrorToolButton.getSelected())
+#		if self.rotateToolButton.getSelected():
+#			self.tool = previewTools.toolRotate(self)
+#		elif self.scaleToolButton.getSelected():
+#			self.tool = previewTools.toolScale(self)
+#		elif self.mirrorToolButton.getSelected():
+#			self.tool = previewTools.toolNone(self)
+#		else:
+		self.tool = previewTools.toolNone(self)
+#		self.resetRotationButton.setHidden(not self.rotateToolButton.getSelected())
+#		self.layFlatButton.setHidden(not self.rotateToolButton.getSelected())
+#		self.resetScaleButton.setHidden(not self.scaleToolButton.getSelected())
+#		self.scaleMaxButton.setHidden(not self.scaleToolButton.getSelected())
+#		self.scaleForm.setHidden(not self.scaleToolButton.getSelected())
+#		self.mirrorXButton.setHidden(not self.mirrorToolButton.getSelected())
+#		self.mirrorYButton.setHidden(not self.mirrorToolButton.getSelected())
+#		self.mirrorZButton.setHidden(not self.mirrorToolButton.getSelected())
 
 	def updateToolButtons(self):
-		if self._selectedObj is None:
-			hidden = True
-		else:
-			hidden = False
-		self.rotateToolButton.setHidden(hidden)
-		self.scaleToolButton.setHidden(hidden)
-		self.mirrorToolButton.setHidden(hidden)
-		if hidden:
-			self.rotateToolButton.setSelected(False)
-			self.scaleToolButton.setSelected(False)
-			self.mirrorToolButton.setSelected(False)
-			self.OnToolSelect(0)
+		pass
+#		if self._selectedObj is None:
+#			hidden = True
+#		else:
+#			hidden = False
+#		self.rotateToolButton.setHidden(hidden)
+#		self.scaleToolButton.setHidden(hidden)
+#		self.mirrorToolButton.setHidden(hidden)
+#		if hidden:
+#			self.rotateToolButton.setSelected(False)
+#			self.scaleToolButton.setSelected(False)
+#			self.mirrorToolButton.setSelected(False)
+#			self.OnToolSelect(0)
 
 	def OnRotateReset(self, button):
 		if self._selectedObj is None:
@@ -511,7 +588,7 @@ class SceneView(openglGui.glGuiPanel):
 		self.QueueRefresh()
 		if len(self._scene.objects()) == 0:
 			self.spectromButton.setDisabled(True)
-			self.saveLayersButton.setDisabled(True)
+#			self.saveLayersButton.setDisabled(True)
 
 
 	def loadScene(self, fileList):
@@ -578,15 +655,16 @@ class SceneView(openglGui.glGuiPanel):
 
 
 	def updateModelSettingsToControls(self):
-		if self._selectedObj is not None:
-			scale = self._selectedObj.getScale()
-			size = self._selectedObj.getSize()
-			self.scaleXctrl.setValue(round(scale[0], 2))
-			self.scaleYctrl.setValue(round(scale[1], 2))
-			self.scaleZctrl.setValue(round(scale[2], 2))
-			self.scaleXmmctrl.setValue(round(size[0], 2))
-			self.scaleYmmctrl.setValue(round(size[1], 2))
-			self.scaleZmmctrl.setValue(round(size[2], 2))
+		pass
+#		if self._selectedObj is not None:
+#			scale = self._selectedObj.getScale()
+#			size = self._selectedObj.getSize()
+#			self.scaleXctrl.setValue(round(scale[0], 2))
+#			self.scaleYctrl.setValue(round(scale[1], 2))
+#			self.scaleZctrl.setValue(round(scale[2], 2))
+#			self.scaleXmmctrl.setValue(round(size[0], 2))
+#			self.scaleYmmctrl.setValue(round(size[1], 2))
+#			self.scaleZmmctrl.setValue(round(size[2], 2))
 
 	def updateLayerRange(self):
 		self._layerHeight = profile.getProfileSettingFloat('layer_height')
@@ -745,7 +823,7 @@ class SceneView(openglGui.glGuiPanel):
 		if e.Dragging() and self._mouseState is not None:
 			if self._mouseState == 'tool':
 				self.tool.OnDrag(p0, p1)
-			elif not e.LeftIsDown() and e.RightIsDown():
+			elif not e.LeftIsDown() and e.RightIsDown() or e.LeftIsDown() and not e.RightIsDown() and self._mouseClickFocus is None:
 				self._mouseState = 'drag'
 				if wx.GetKeyState(wx.WXK_SHIFT):
 					a = math.cos(math.radians(self._yaw)) / 3.0

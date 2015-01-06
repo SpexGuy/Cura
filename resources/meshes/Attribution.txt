@@ -1,3 +1,6 @@
 * ultimaker_platform.stl: 3D platform from the Ultimaker. Derivative from Ultimaker lasercut drawings. CC BY-NC 3.0 license (http://creativecommons.org/licenses/by-nc/3.0/)
   http://www.thingiverse.com/thing:13571
 * ultimaker2_platform.stl: 3D platform from the Ultimaker2, released by Ultimaker for Cura. CC BY-NC 3.0 license (http://creativecommons.org/licenses/by-nc/3.0/)
+* DalekHoles.stl: Created by thingiverse user RevK, released at http://www.thingiverse.com/thing:192937. CC BY 3.0 license (http://creativecommons.org/licenses/by/3.0/)
+* SpiralVase.stl: Created by thingiverse user anoved, released at http://www.thingiverse.com/thing:275932. CC BY 3.0 license (http://creativecommons.org/licenses/by/3.0/)
+* BusinessCardHolder.stl: Created by thingiverse user rhmorrison, released at http://www.thingiverse.com/thing:28826. CC BY 3.0 license (http://creativecommons.org/licenses/by/3.0/)

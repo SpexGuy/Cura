@@ -140,6 +140,21 @@ class CuraApp(wx.App):
 				if wx.MessageBox(_("A new version of Cura is available, would you like to download?"), _("New version available"), wx.YES_NO | wx.ICON_INFORMATION) == wx.YES:
 					webbrowser.open(newVersion)
 					return
+
+		profile.putMachineSetting('machine_name', 'spectrom')
+		profile.putMachineSetting('machine_width', '200')
+		profile.putMachineSetting('machine_depth', '200')
+		profile.putMachineSetting('machine_height', '200')
+		profile.putProfileSetting('nozzle_size', '0.4')
+		profile.putProfileSetting('wall_thickness', float(profile.getProfileSettingFloat('nozzle_size')) * 2)
+		profile.putMachineSetting('has_heated_bed', 'True')
+		profile.putMachineSetting('machine_center_is_zero', 'False')
+		profile.putMachineSetting('extruder_head_size_min_x', '0')
+		profile.putMachineSetting('extruder_head_size_min_y', '0')
+		profile.putMachineSetting('extruder_head_size_max_x', '0')
+		profile.putMachineSetting('extruder_head_size_max_y', '0')
+		profile.putMachineSetting('extruder_head_size_height', '0')
+		profile.checkAndUpdateMachineName()
 		if profile.getMachineSetting('machine_name') == '':
 			return
 		self.mainWindow = mainWindow.mainWindow()

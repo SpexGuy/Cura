@@ -429,6 +429,7 @@ class glButton(glGuiControl):
 		self._callback = callback
 		self._selected = False
 		self._focus = False
+		self._forceText = False
 		self._disabled = False
 		self._showExpandArrow = False
 		self._progressBar = None
@@ -439,6 +440,9 @@ class glButton(glGuiControl):
 
 	def setExpandArrow(self, value):
 		self._showExpandArrow = value
+
+	def setForceText(self, value):
+		self._forceText = value
 
 	def setHidden(self, value):
 		self._hidden = value
@@ -501,7 +505,7 @@ class glButton(glGuiControl):
 		glPushMatrix()
 		glTranslatef(pos[0], pos[1], 0)
 		glDisable(GL_TEXTURE_2D)
-		if self._focus:
+		if self._focus or self._forceText and not self._disabled:
 			glTranslatef(0, -0.55*bs*scale, 0)
 
 			glPushMatrix()
@@ -1106,7 +1110,10 @@ class glSlider(glGuiControl):
 			w, h = self.getMinSize()
 			scrollLength = h - w
 			pos = self._getPixelPos()
-			self.setValue(int(self._minValue + (self._maxValue - self._minValue) * -(y - pos[1] - scrollLength/2) / scrollLength))
+			span = (self._maxValue - self._minValue)
+			percent = -float(y - pos[1] - scrollLength/2) / scrollLength
+			value = int(self._minValue + span/3 * round(3 * percent))
+			self.setValue(value)
 			self._callback()
 			return True
 		if self._checkHit(x, y):
@@ -1129,8 +1136,8 @@ class glSlider(glGuiControl):
 		return False
 
 class glColorSlider(glSlider):
-	width = 0.2
-	height = 2
+	width = 0.6
+	height = 2.4
 
 	def __init__(self, parent, color, value, pos, callback):
 		super(glColorSlider, self).__init__(parent, value, 0, 256, pos, callback)
@@ -1256,8 +1263,8 @@ class glColorPicker(glGuiContainer):
 			glEnd()
 
 class glRangeSelect(glGuiControl):
-	width = 0.2
-	height = 4
+	width = 0.6
+	height = 8
 
 	def __init__(self, parent, pos, minValue, maxValue, callback):
 		self._callback = callback
@@ -1334,7 +1341,7 @@ class glRangeSelect(glGuiControl):
 		maxSelect = self.getMaxSelect()
 		maxHeight = h*self.getNormalizedValue(maxSelect)
 		minHeight = h*self.getNormalizedValue(minSelect)
-		if True:  # self._focus:
+		if False:  # self._focus:
 			scrollLength = h - w
 			self._setTextColor()
 			glPushMatrix()
