@@ -16,7 +16,6 @@ def main():
 	"""
 	Main Cura entry point. Parses arguments, loads profile, and starts GUI.
 	"""
-	print "very start"
 	parser = OptionParser(usage="usage: %prog [options] <filename>.stl")
 	parser.add_option("-i", "--ini", action="store", type="string", dest="profileini",
 		help="Load settings from a profile ini file")
@@ -27,13 +26,10 @@ def main():
 	parser.add_option("-o", "--output", action="store", type="string", dest="output",
 		help="path to write sliced file to")
 
-	print "parser setup"
 	(options, args) = parser.parse_args()
-	print "parser parsed"
 
 	print "load preferences from " + profile.getPreferencePath()
 	profile.loadPreferences(profile.getPreferencePath())
-	print "Loaded prefs"
 
 	if options.profile is not None:
 		profile.setProfileFromString(options.profile)

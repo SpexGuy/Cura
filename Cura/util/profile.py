@@ -923,7 +923,6 @@ def savePreferences(filename):
 		parser.add_section('machine_%d' % (n))
 		for set in settingsList:
 			if set.isMachineSetting():
-				print "Setting %s" % (set.getName())
 				parser.set('machine_%d' % (n), set.getName(), set.getValue(n).encode('utf-8'))
 		n += 1
 	try:

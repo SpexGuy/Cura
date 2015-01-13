@@ -23,6 +23,7 @@ from Cura.util import resources
 from Cura.util import sliceEngine
 from Cura.util import explorer
 from Cura.util import bigDataStorage
+from Cura.util import version
 from Cura.gui.util import previewTools
 from Cura.gui.util import openglHelpers
 from Cura.gui.util import openglGui
@@ -499,7 +500,8 @@ class SceneView(openglGui.glGuiPanel):
 		self.sceneUpdated()
 
 	def _splitCallback(self, progress):
-		print progress
+		#print progress
+		pass
 
 	def OnMergeObjects(self, e):
 		if self._selectedObj is None or self._focusObj is None or self._selectedObj == self._focusObj:
@@ -550,15 +552,18 @@ class SceneView(openglGui.glGuiPanel):
 			self.spectromButton.setProgressBar(None)
 		if finished:
 			self.spectromButton.setProgressBar(None)
-			text = '%s' % (result.getPrintTime())
+			text = ''
+			if version.isDevVersion():
+				text += '%s' % (result.getPrintTime())
 			for e in xrange(0, int(profile.getMachineSetting('extruder_amount'))):
 				amount = result.getFilamentAmount(e)
 				if amount is None:
 					continue
-				text += '\n%s' % (amount)
+				if version.isDevVersion():
+					text += '\n%s' % (amount)
 				cost = result.getSpectromPrice(e)
 				if cost is not None:
-					text += '\n%s' % (cost)
+					text += '\nEstimated Price:\n%s' % (cost)
 			self.spectromButton.setBottomText(text)
 		else:
 			self.spectromButton.setBottomText('')
