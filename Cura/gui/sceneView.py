@@ -20,7 +20,9 @@ from Cura.util import profile
 from Cura.util import meshLoader
 from Cura.util import objectScene
 from Cura.util import resources
+from Cura.util import sliceEngine
 from Cura.util import explorer
+from Cura.util import bigDataStorage
 from Cura.gui.util import previewTools
 from Cura.gui.util import openglHelpers
 from Cura.gui.util import openglGui
@@ -100,6 +102,10 @@ class SceneView(openglGui.glGuiPanel):
 		self.layerColorer = openglGui.glColorPicker(self, (-2, -5.4), (1,1,1), lambda: self.layerColors.setColor(self.layerColorer.getColor()))
 
 		self.notification = openglGui.glNotification(self, (0, 0))
+
+		self._engine = sliceEngine.Engine(self._updateEngineProgress)
+		self._sceneUpdateTimer = wx.Timer(self)
+		self.Bind(wx.EVT_TIMER, self._onRunEngine, self._sceneUpdateTimer)
 
 		self.Bind(wx.EVT_MOUSEWHEEL, self.OnMouseWheel)
 		self.Bind(wx.EVT_LEAVE_WINDOW, self.OnMouseLeave)
@@ -212,7 +218,6 @@ class SceneView(openglGui.glGuiPanel):
 			self.notification.message(message)
 
 	def loadSceneFiles(self, filenames):
-		self.spectromButton.setDisabled(False)
 		self.saveLayersButton.setDisabled(False)
 		self.loadScene(filenames)
 
@@ -506,13 +511,58 @@ class SceneView(openglGui.glGuiPanel):
 		self.sceneUpdated()
 
 	def sceneUpdated(self):
+		self._engine.abortEngine()
 		self._scene.updateSizeOffsets()
 		self.updateLayerRange()
 		self.QueueRefresh()
 		if len(self._scene.objects()) == 0:
 			self.spectromButton.setDisabled(True)
 			self.saveLayersButton.setDisabled(True)
+		else:
+			for obj in self._scene.objects():
+				if not self._scene.checkPlatform(obj):
+					self.spectromButton.setDisabled(True)
+					self.spectromButton.setBottomText("object is\nout of bounds")
+					break
+			else:
+				self._sceneUpdateTimer.Start(500, True)
 
+
+
+	def _onRunEngine(self, e):
+#		TODO: something similar for settings?
+#		if self._isSimpleMode:
+#			self.GetTopLevelParent().simpleSettingsPanel.setupSlice()
+		self._engine.runEngine(self._scene)
+#		if self._isSimpleMode:
+#			profile.resetTempOverride()
+
+	def _updateEngineProgress(self, progressValue):
+		result = self._engine.getResult()
+		finished = result is not None and result.isFinished()
+		if not finished:
+			if self.spectromButton.getProgressBar() is not None and progressValue >= 0.0 and abs(self.spectromButton.getProgressBar() - progressValue) < 0.01:
+				return
+		self.spectromButton.setDisabled(not finished)
+		if progressValue >= 0.0:
+			self.spectromButton.setProgressBar(progressValue)
+		else:
+			self.spectromButton.setProgressBar(None)
+		if finished:
+			self.spectromButton.setProgressBar(None)
+			text = '%s' % (result.getPrintTime())
+			for e in xrange(0, int(profile.getMachineSetting('extruder_amount'))):
+				amount = result.getFilamentAmount(e)
+				if amount is None:
+					continue
+				text += '\n%s' % (amount)
+				cost = result.getSpectromPrice(e)
+				if cost is not None:
+					text += '\n%s' % (cost)
+			self.spectromButton.setBottomText(text)
+		else:
+			self.spectromButton.setBottomText('')
+		self.QueueRefresh()
 
 	def loadScene(self, fileList):
 		for filename in fileList:

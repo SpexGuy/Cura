@@ -49,8 +49,8 @@ class mainWindow(wx.Frame):
 
 		self.menubar = wx.MenuBar()
 		self.fileMenu = wx.Menu()
-		i = self.fileMenu.Append(-1, _("Load model file...\tCTRL+L"))
-		self.Bind(wx.EVT_MENU, lambda e: self.scene.showLoadModel(), i)
+		i = self.fileMenu.Append(-1, _("Load file...\tCTRL+L"))
+		self.Bind(wx.EVT_MENU, lambda e: self.scene.showLoadFile(), i)
 
 		# Model MRU list
 		modelHistoryMenu = wx.Menu()

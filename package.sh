@@ -24,7 +24,10 @@ TARGET_DIR=Cura-${BUILD_NAME}-${BUILD_TARGET}
 ##Which versions of external programs to use
 WIN_PORTABLE_PY_VERSION=2.7.2.1
 
-
+##Which CuraEngine to use
+if [ -z ${CURA_ENGINE_REPO} ] ; then
+	CURA_ENGINE_REPO="https://github.com/Ultimaker/CuraEngine"
+fi
 
 #############################
 # Support functions
@@ -115,6 +118,12 @@ if [ "$BUILD_TARGET" = "darwin" ]; then
 
     #Add cura version file (should read the version from the bundle with pyobjc, but will figure that out later)
     echo $BUILD_NAME > scripts/darwin/dist/Cura.app/Contents/Resources/version
+	rm -rf CuraEngine
+	git clone ${CURA_ENGINE_REPO}
+    if [ $? != 0 ]; then echo "Failed to clone CuraEngine"; exit 1; fi
+	make -C CuraEngine VERSION=${BUILD_NAME}
+    if [ $? != 0 ]; then echo "Failed to build CuraEngine"; exit 1; fi
+	cp CuraEngine/build/CuraEngine scripts/darwin/dist/Cura.app/Contents/Resources/CuraEngine
 
 	cd scripts/darwin
 
@@ -145,6 +154,11 @@ fi
 
 if [ "$BUILD_TARGET" = "freebsd" ]; then
 	export CXX="c++"
+	rm -rf CuraEngine
+	git clone ${CURA_ENGINE_REPO}
+    if [ $? != 0 ]; then echo "Failed to clone CuraEngine"; exit 1; fi
+	gmake -j4 -C CuraEngine VERSION=${BUILD_NAME}
+    if [ $? != 0 ]; then echo "Failed to build CuraEngine"; exit 1; fi
 	rm -rf scripts/freebsd/dist
 	mkdir -p scripts/freebsd/dist/share/cura
 	mkdir -p scripts/freebsd/dist/share/applications
@@ -152,6 +166,7 @@ if [ "$BUILD_TARGET" = "freebsd" ]; then
 	cp -a Cura scripts/freebsd/dist/share/cura/
 	cp -a resources scripts/freebsd/dist/share/cura/
 	cp -a plugins scripts/freebsd/dist/share/cura/
+	cp -a CuraEngine/build/CuraEngine scripts/freebsd/dist/share/cura/
 	cp scripts/freebsd/cura.py scripts/freebsd/dist/share/cura/
 	cp scripts/freebsd/cura.desktop scripts/freebsd/dist/share/applications/
 	cp scripts/freebsd/cura scripts/freebsd/dist/bin/
@@ -184,11 +199,17 @@ fi
 
 if [ "$BUILD_TARGET" = "debian_i386" ]; then
     export CXX="g++ -m32"
+	rm -rf CuraEngine
+	git clone ${CURA_ENGINE_REPO}
+    if [ $? != 0 ]; then echo "Failed to clone CuraEngine"; exit 1; fi
+	make -C CuraEngine VERSION=${BUILD_NAME}
+    if [ $? != 0 ]; then echo "Failed to build CuraEngine"; exit 1; fi
 	rm -rf scripts/linux/${BUILD_TARGET}/usr/share/cura
 	mkdir -p scripts/linux/${BUILD_TARGET}/usr/share/cura
 	cp -a Cura scripts/linux/${BUILD_TARGET}/usr/share/cura/
 	cp -a resources scripts/linux/${BUILD_TARGET}/usr/share/cura/
 	cp -a plugins scripts/linux/${BUILD_TARGET}/usr/share/cura/
+	cp -a CuraEngine/build/CuraEngine scripts/linux/${BUILD_TARGET}/usr/share/cura/
 	cp scripts/linux/cura.py scripts/linux/${BUILD_TARGET}/usr/share/cura/
 	echo $BUILD_NAME > scripts/linux/${BUILD_TARGET}/usr/share/cura/Cura/version
 	sudo chown root:root scripts/linux/${BUILD_TARGET} -R
@@ -206,11 +227,17 @@ fi
 
 if [ "$BUILD_TARGET" = "debian_amd64" ]; then
     export CXX="g++ -m64"
+	rm -rf CuraEngine
+	git clone ${CURA_ENGINE_REPO}
+    if [ $? != 0 ]; then echo "Failed to clone CuraEngine"; exit 1; fi
+	make -C CuraEngine
+    if [ $? != 0 ]; then echo "Failed to build CuraEngine"; exit 1; fi
 	rm -rf scripts/linux/${BUILD_TARGET}/usr/share/cura
 	mkdir -p scripts/linux/${BUILD_TARGET}/usr/share/cura
 	cp -a Cura scripts/linux/${BUILD_TARGET}/usr/share/cura/
 	cp -a resources scripts/linux/${BUILD_TARGET}/usr/share/cura/
 	cp -a plugins scripts/linux/${BUILD_TARGET}/usr/share/cura/
+	cp -a CuraEngine/build/CuraEngine scripts/linux/${BUILD_TARGET}/usr/share/cura/
 	cp scripts/linux/cura.py scripts/linux/${BUILD_TARGET}/usr/share/cura/
 	echo $BUILD_NAME > scripts/linux/${BUILD_TARGET}/usr/share/cura/Cura/version
 	sudo chown root:root scripts/linux/${BUILD_TARGET} -R
@@ -236,6 +263,9 @@ if [ $BUILD_TARGET = "win32" ]; then
 	downloadURL http://sourceforge.net/projects/pyopengl/files/PyOpenGL/3.0.1/PyOpenGL-3.0.1.win32.exe
 	downloadURL http://sourceforge.net/projects/numpy/files/NumPy/1.6.2/numpy-1.6.2-win32-superpack-python2.7.exe
 	#downloadURL http://ffmpeg.zeranoe.com/builds/win32/static/ffmpeg-20120927-git-13f0cd6-win32-static.7z
+	rm -rf CuraEngine
+	git clone ${CURA_ENGINE_REPO}
+    if [ $? != 0 ]; then echo "Failed to clone CuraEngine"; exit 1; fi
 fi
 
 #############################
@@ -281,6 +311,10 @@ if [ $BUILD_TARGET = "win32" ]; then
 	rm -rf ${TARGET_DIR}/python/Lib/site-packages/wx-2.8-msw-unicode/wx/locale
 	#Remove the gle files because they require MSVCR71.dll, which is not included. We also don't need gle, so it's safe to remove it.
 	rm -rf ${TARGET_DIR}/python/Lib/OpenGL/DLLS/gle*
+
+    #Build the C++ engine
+	mingw32-make -C CuraEngine VERSION=${BUILD_NAME}
+    if [ $? != 0 ]; then echo "Failed to build CuraEngine"; exit 1; fi
 fi
 
 #add Cura
@@ -294,6 +328,7 @@ echo $BUILD_NAME > ${TARGET_DIR}/Cura/version
 #add script files
 if [ $BUILD_TARGET = "win32" ]; then
     cp -a scripts/${BUILD_TARGET}/*.bat $TARGET_DIR/
+    cp CuraEngine/build/CuraEngine.exe $TARGET_DIR
 else
     cp -a scripts/${BUILD_TARGET}/*.sh $TARGET_DIR/
 fi

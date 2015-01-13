@@ -16,7 +16,6 @@ from Cura.util.meshLoaders import stl
 from Cura.util.meshLoaders import amf
 from Cura.util.resources import getPathForImage
 
-DESIGN_FILE_EXT = ['.scad', '.blend', '.max', '.stp', '.step', '.igs', '.iges', '.sldasm', '.sldprt', '.skp', '.iam', '.prt', '.x_t', '.ipt', '.dwg', '.123d', '.wings', '.fcstd', '.top']
 EMAIL_RE = re.compile(r"^[-!#$%&'*+/0-9=?A-Z^_a-z{|}~](\.?[-!#$%&'*+/0-9=?A-Z^_a-z{|}~])*@[a-zA-Z](-?[a-zA-Z0-9])*(\.[a-zA-Z](-?[a-zA-Z0-9])*)+$")
 
 def getClipboardText():

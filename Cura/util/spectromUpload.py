@@ -17,7 +17,16 @@ except:
 from Cura.util import profile
 from Cura.util.meshLoaders import stl
 
-#stl.saveSceneStream(httpUploadDataStream, objects)
+#TODO: look up online
+def getSpectromFilamentPrice():
+	return 0.5
+
+def getSpectromBasePrice():
+	return 10
+
+def getSpectromPrice(filamentLength):
+	price = getSpectromFilamentPrice() * filamentLength/1000.0 + getSpectromBasePrice()
+	return float(int(price * 100)) / 100
 
 class httpUploadDataStream(object):
 	"""

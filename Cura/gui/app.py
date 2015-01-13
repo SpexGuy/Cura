@@ -17,10 +17,12 @@ except ImportError:
 class CuraApp(wx.App):
 	def __init__(self, files):
 		if platform.system() == "Windows" and not 'PYCHARM_HOSTED' in os.environ:
-			super(CuraApp, self).__init__(redirect=True, filename='output.txt')
+			#super(CuraApp, self).__init__(redirect=True, filename='output.txt')
+			super(CuraApp, self).__init__(redirect=False)
 		else:
 			super(CuraApp, self).__init__(redirect=False)
 
+		print "Starting"
 		self.mainWindow = None
 		self.splash = None
 		self.loadFiles = files
@@ -94,6 +96,7 @@ class CuraApp(wx.App):
 			pass
 
 	def afterSplashCallback(self):
+		print "After splash"
 		#These imports take most of the time and thus should be done after showing the splashscreen
 		import webbrowser
 		from Cura.gui import mainWindow
@@ -104,26 +107,13 @@ class CuraApp(wx.App):
 
 		resources.setupLocalization(profile.getPreference('language'))  # it's important to set up localization at very beginning to install _
 
-		#If we do not have preferences yet, try to load it from a previous Cura install
-		if profile.getMachineSetting('machine_type') == 'unknown':
-			try:
-				otherCuraInstalls = profile.getAlternativeBasePaths()
-				otherCuraInstalls.sort()
-				if len(otherCuraInstalls) > 0:
-					profile.loadPreferences(os.path.join(otherCuraInstalls[-1], 'preferences.ini'))
-					profile.loadProfile(os.path.join(otherCuraInstalls[-1], 'current_profile.ini'))
-			except:
-				import traceback
-				print traceback.print_exc()
-
 		#If we haven't run it before, run the configuration wizard.
-		if profile.getMachineSetting('machine_type') == 'unknown':
-			otherCuraInstalls = profile.getAlternativeBasePaths()
-			otherCuraInstalls.sort()
-			if len(otherCuraInstalls) > 0:
-				profile.loadPreferences(os.path.join(otherCuraInstalls[-1], 'preferences.ini'))
-				profile.loadProfile(os.path.join(otherCuraInstalls[-1], 'current_profile.ini'))
+		if profile.getMachineSetting('machine_name') == '':
+			print "Running config wizard"
+			profile.putMachineSetting('machine_name', 'Spectrom_low_quality')
+			profile.checkAndUpdateMachineName()
 			#Check if we need to copy our examples
+			#TODO: Spectrom example file
 			exampleFile = os.path.normpath(os.path.join(resources.resourceBasePath, 'example', 'UltimakerRobot_support.stl'))
 
 			self.loadFiles = [exampleFile]
@@ -133,6 +123,7 @@ class CuraApp(wx.App):
 			#TODO: Tutorial?
 
 		if profile.getPreference('check_for_updates') == 'True':
+			print "Check for updates"
 			newVersion = version.checkForNewerVersion()
 			if newVersion is not None:
 				if self.splash is not None:
@@ -141,6 +132,7 @@ class CuraApp(wx.App):
 					webbrowser.open(newVersion)
 					return
 		if profile.getMachineSetting('machine_name') == '':
+			print "No machine_name"
 			return
 		self.mainWindow = mainWindow.mainWindow()
 		if self.splash is not None:

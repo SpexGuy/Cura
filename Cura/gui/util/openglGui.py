@@ -96,9 +96,9 @@ class glGuiContainer(glGuiControl):
 		self._glGuiControlList.append(ctrl)
 		self.updateLayout()
 
-	def OnMouseDown(self, x, y, button):
+	def OnMouseDown(self, x, y, button, e):
 		for ctrl in self._glGuiControlList:
-			if ctrl.OnMouseDown(x, y, button):
+			if ctrl.OnMouseDown(x, y, button, e):
 				return True
 		return False
 
@@ -108,10 +108,10 @@ class glGuiContainer(glGuiControl):
 				return True
 		return False
 
-	def OnMouseMotion(self, x, y):
+	def OnMouseMotion(self, x, y, e):
 		handled = False
 		for ctrl in self._glGuiControlList:
-			if ctrl.OnMouseMotion(x, y):
+			if ctrl.OnMouseMotion(x, y, e):
 				handled = True
 		return handled
 
@@ -183,7 +183,7 @@ class glGuiPanel(glcanvas.GLCanvas):
 
 	def _OnGuiMouseDown(self,e):
 		self.SetFocus()
-		if self._container.OnMouseDown(e.GetX(), e.GetY(), e.GetButton()):
+		if self._container.OnMouseDown(e.GetX(), e.GetY(), e.GetButton(), e):
 			self.Refresh()
 			return
 		self.OnMouseDown(e)
@@ -196,7 +196,7 @@ class glGuiPanel(glcanvas.GLCanvas):
 
 	def _OnGuiMouseMotion(self,e):
 		self.Refresh()
-		if not self._container.OnMouseMotion(e.GetX(), e.GetY()):
+		if not self._container.OnMouseMotion(e.GetX(), e.GetY(), e):
 			self.OnMouseMotion(e)
 
 	def _OnGuiPaint(self, e):
@@ -557,14 +557,14 @@ class glButton(glGuiControl):
 		pos = self._getPixelPos()
 		return -bs * 0.5 <= x - pos[0] <= bs * 0.5 and -bs * 0.5 <= y - pos[1] <= bs * 0.5
 
-	def OnMouseMotion(self, x, y):
+	def OnMouseMotion(self, x, y, e):
 		if self._checkHit(x, y):
 			self._focus = True
 			return True
 		self._focus = False
 		return False
 
-	def OnMouseDown(self, x, y, button):
+	def OnMouseDown(self, x, y, button, e):
 		if self._checkHit(x, y):
 			self._callback(button)
 			return True
@@ -655,7 +655,7 @@ class glComboButton(glButton):
 		self._imageID = self._imageIDs[self._selection]
 		self._comboCallback()
 
-	def OnMouseDown(self, x, y, button):
+	def OnMouseDown(self, x, y, button, e):
 		if self._hidden or self._disabled:
 			return False
 		if self.hasFocus():
@@ -667,7 +667,7 @@ class glComboButton(glButton):
 				self._base._focus = None
 				self._comboCallback()
 				return True
-		return super(glComboButton, self).OnMouseDown(x, y, button)
+		return super(glComboButton, self).OnMouseDown(x, y, button, e)
 
 class glFrame(glGuiContainer):
 	def __init__(self, parent, pos):
@@ -715,17 +715,17 @@ class glFrame(glGuiContainer):
 		w, h = self._layout.getLayoutSize()
 		return 0 <= x - pos[0] <= w and 0 <= y - pos[1] <= h
 
-	def OnMouseMotion(self, x, y):
-		super(glFrame, self).OnMouseMotion(x, y)
+	def OnMouseMotion(self, x, y, e):
+		super(glFrame, self).OnMouseMotion(x, y, e)
 		if self._checkHit(x, y):
 			self._focus = True
 			return True
 		self._focus = False
 		return False
 
-	def OnMouseDown(self, x, y, button):
+	def OnMouseDown(self, x, y, button, e):
 		if self._checkHit(x, y):
-			super(glFrame, self).OnMouseDown(x, y, button)
+			super(glFrame, self).OnMouseDown(x, y, button, e)
 			return True
 		return False
 
@@ -816,10 +816,10 @@ class glLabel(glGuiControl):
 	def _checkHit(self, x, y):
 		return False
 
-	def OnMouseMotion(self, x, y):
+	def OnMouseMotion(self, x, y, e):
 		return False
 
-	def OnMouseDown(self, x, y, button):
+	def OnMouseDown(self, x, y, button, e):
 		return False
 
 class glNumberCtrl(glGuiControl):
@@ -877,10 +877,10 @@ class glNumberCtrl(glGuiControl):
 		x1, y1, w, h = self.getSize()
 		return 0 <= x - x1 <= w and 0 <= y - y1 <= h
 
-	def OnMouseMotion(self, x, y):
+	def OnMouseMotion(self, x, y, e):
 		return False
 
-	def OnMouseDown(self, x, y, button):
+	def OnMouseDown(self, x, y, button, e):
 		if self._checkHit(x, y):
 			self.setFocus()
 			return True
@@ -978,10 +978,10 @@ class glCheckbox(glGuiControl):
 		x1, y1, w, h = self.getSize()
 		return 0 <= x - x1 <= w and 0 <= y - y1 <= h
 
-	def OnMouseMotion(self, x, y):
+	def OnMouseMotion(self, x, y, e):
 		return False
 
-	def OnMouseDown(self, x, y, button):
+	def OnMouseDown(self, x, y, button, e):
 		if self._checkHit(x, y):
 			self._value = not self._value
 			return True
@@ -1101,7 +1101,7 @@ class glSlider(glGuiControl):
 		self._base._focus = self
 		return True
 
-	def OnMouseMotion(self, x, y):
+	def OnMouseMotion(self, x, y, e):
 		if self.hasFocus():
 			w, h = self.getMinSize()
 			scrollLength = h - w
@@ -1115,10 +1115,10 @@ class glSlider(glGuiControl):
 		self._focus = False
 		return False
 
-	def OnMouseDown(self, x, y, button):
+	def OnMouseDown(self, x, y, button, e):
 		if self._checkHit(x, y):
 			self.setFocus()
-			self.OnMouseMotion(x, y)
+			self.OnMouseMotion(x, y, e)
 			return True
 		return False
 
@@ -1194,10 +1194,10 @@ class glColorRect(glGuiControl):
 		x1, y1, w, h = self.getSize()
 		return 0 <= x - x1 <= w and 0 <= y - y1 <= h
 
-	def OnMouseMotion(self, x, y):
+	def OnMouseMotion(self, x, y, e):
 		return False
 
-	def OnMouseDown(self, x, y, button):
+	def OnMouseDown(self, x, y, button, e):
 		return False
 
 	def OnMouseUp(self, x, y):
@@ -1272,8 +1272,20 @@ class glRangeSelect(glGuiControl):
 	def setRange(self, minValue, maxValue):
 		if maxValue < minValue:
 			maxValue = minValue
+		self._setRange(minValue, maxValue)
+		self._callback()
+
+	def _setRange(self, minValue, maxValue):
+		oldRange = self._maxValue - self._minValue
+		newRange = maxValue - minValue
+
+		newBase = minValue + (self._baseSelect - self._minValue) * newRange // oldRange
+		newEnd  = minValue + (self._endSelect  - self._minValue) * newRange // oldRange
+
 		self._minValue = minValue
 		self._maxValue = maxValue
+		self._baseSelect = newBase
+		self._endSelect = newEnd
 
 	def getMinValue(self):
 		return self._minValue
@@ -1398,9 +1410,9 @@ class glRangeSelect(glGuiControl):
 		self._base._focus = self
 		return True
 
-	def OnMouseMotion(self, x, y):
+	def OnMouseMotion(self, x, y, e):
 		if self.hasFocus():
-			self._handleMotion(y)
+			self._handleMotion(y, e)
 			self._callback()
 			return True
 		if self._checkHit(x, y):
@@ -1409,20 +1421,26 @@ class glRangeSelect(glGuiControl):
 		self._focus = False
 		return False
 
-	def _handleMotion(self, y):
+	def _getIndexForPixel(self, y):
 		w, h = self.getMinSize()
 		pos = self._getPixelPos()
 		newValue = int(self._minValue + (self._maxValue - self._minValue) * -(y - pos[1] - h/2) / h)
-		self._endSelect = max(self._minValue, min(newValue, self._maxValue))
+		return max(self._minValue, min(newValue, self._maxValue))
 
-	def OnMouseDown(self, x, y, button):
+	def _handleMotion(self, y, e):
+		self._endSelect = self._getIndexForPixel(y)
+
+	def OnMouseDown(self, x, y, button, e):
 		if self._checkHit(x, y):
 			self.setFocus()
-			self._handleMotion(y)
-			self._baseSelect = self._endSelect
+			self._mouseDown(x, y, button, e)
 			self._callback()
 			return True
 		return False
+
+	def _mouseDown(self, x, y, button, e):
+		self._handleMotion(y, e)
+		self._baseSelect = self._endSelect		
 
 	def OnMouseUp(self, x, y):
 		if self.hasFocus():
@@ -1437,11 +1455,10 @@ class glColorRangeSelect(glRangeSelect):
 	def __init__(self, parent, pos, minValue, maxValue, initColor, callback):
 		self._colors = [initColor]
 		self._layers = [maxValue]
+		self._baseIndex = 0
 		super(glColorRangeSelect, self).__init__(parent, pos, minValue, maxValue, callback)
 
-	def setRange(self, minValue, maxValue):
-		if maxValue < minValue:
-			maxValue = minValue
+	def _setRange(self, minValue, maxValue):
 		newRange = maxValue - minValue
 		oldRange = self._maxValue - self._minValue
 		obselete = []
@@ -1456,9 +1473,7 @@ class glColorRangeSelect(glRangeSelect):
 		while(self._layers[0] <= minValue):
 			self._clearRange(0, 1)
 		# update internal values
-		self._minValue = minValue
-		self._maxValue = maxValue
-
+		super(glColorRangeSelect, self)._setRange(minValue, maxValue)
 
 	def getLayers(self):
 		return self._layers
@@ -1531,6 +1546,39 @@ class glColorRangeSelect(glRangeSelect):
 			lastLayerHeight = layerHeight
 		glEnd()
 		glPopMatrix()
+
+	def _handleMotion(self, y, e):
+		if e.LeftIsDown():
+			super(glColorRangeSelect, self)._handleMotion(y, e)
+		else:
+			layer = self._getIndexForPixel(y)
+			index, exact = self.findLayerIndex(layer)
+			if index < self._baseIndex:
+				if index == 0:
+					self._endSelect = self._minValue
+				else:
+					self._endSelect = self._layers[index-1]
+				self._baseSelect = self._layers[self._baseIndex]
+			else:
+				if self._baseIndex == 0:
+					self._baseSelect = self._minValue
+				else:
+					self._baseSelect = self._layers[self._baseIndex-1]
+				self._endSelect = self._layers[index]
+
+
+	def _mouseDown(self, x, y, button, e):
+		if button == 1:
+			super(glColorRangeSelect, self)._mouseDown(x, y, button, e)
+		else:
+			layer = self._getIndexForPixel(y)
+			index, exact = self.findLayerIndex(layer)
+			if index == 0:
+				self._baseSelect = self._minValue
+			else:
+				self._baseSelect = self._layers[index-1]
+			self._endSelect = self._layers[index]
+			self._baseIndex = index
 
 #class glLayerPainter(glGuiContainer):
 
