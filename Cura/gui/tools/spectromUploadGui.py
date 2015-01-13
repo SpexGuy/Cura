@@ -103,7 +103,7 @@ class spectromUploadManager(object):
 
 class termsAndConditionsWindow(wx.Frame):
 	def __init__(self, parent, termsUrl, termsVersion, callback):
-		super(termsAndConditionsWindow, self).__init__(parent, title='End User License Agreement - Version %s' % (termsVersion), style=wx.FRAME_TOOL_WINDOW|wx.FRAME_FLOAT_ON_PARENT|wx.FRAME_NO_TASKBAR|wx.CAPTION)
+		super(termsAndConditionsWindow, self).__init__(parent, size=(800,600), title='End User License Agreement - Version %s' % (termsVersion), style=wx.MAXIMIZE_BOX|wx.CLOSE_BOX|wx.RESIZE_BORDER|wx.FRAME_TOOL_WINDOW|wx.STAY_ON_TOP|wx.FRAME_NO_TASKBAR|wx.CAPTION)
 		self._callback = callback
 		self._version = termsVersion
 		licenseFile = urllib2.urlopen(termsUrl)
@@ -111,7 +111,7 @@ class termsAndConditionsWindow(wx.Frame):
 		licenseFile.close()
 
 		panel = wx.Panel(self, wx.ID_ANY)
-		terms = wx.TextCtrl(panel, wx.ID_ANY, size=(300,100), style = wx.TE_MULTILINE | wx.TE_READONLY | wx.HSCROLL)
+		terms = wx.TextCtrl(panel, wx.ID_ANY, style = wx.TE_MULTILINE | wx.TE_READONLY)
 		buttonPanel = wx.Panel(panel, wx.ID_ANY)
 		acceptButton = wx.Button(buttonPanel, wx.ID_ANY, 'Accept')
 		cancelButton = wx.Button(buttonPanel, wx.ID_ANY, 'Cancel')
@@ -145,7 +145,7 @@ class termsAndConditionsWindow(wx.Frame):
 
 class workingIndicatorWindow(wx.Frame):
 	def __init__(self, parent):
-		super(workingIndicatorWindow, self).__init__(parent, title='Spectrom', style=wx.FRAME_TOOL_WINDOW|wx.FRAME_FLOAT_ON_PARENT|wx.FRAME_NO_TASKBAR|wx.CAPTION)
+		super(workingIndicatorWindow, self).__init__(parent, title='Spectrom', style=wx.FRAME_TOOL_WINDOW|wx.STAY_ON_TOP|wx.FRAME_NO_TASKBAR|wx.CAPTION)
 		self._panel = wx.Panel(self)
 		self.SetSizer(wx.BoxSizer())
 		self.GetSizer().Add(self._panel, 1, wx.EXPAND)
@@ -198,7 +198,7 @@ class workingIndicatorWindow(wx.Frame):
 
 class configureWindow(wx.Frame):
 	def __init__(self, parent, callback):
-		super(configureWindow, self).__init__(parent, title='Spectrom Profile')
+		super(configureWindow, self).__init__(parent, title='Spectrom Profile', style=wx.CLOSE_BOX|wx.SYSTEM_MENU|wx.STAY_ON_TOP|wx.FRAME_NO_TASKBAR|wx.CAPTION)
 		self._panel = wx.Panel(self)
 		self.SetSizer(wx.BoxSizer())
 		self.GetSizer().Add(self._panel, 1, wx.EXPAND)
@@ -271,7 +271,7 @@ class configureWindow(wx.Frame):
 
 class newDesignWindow(wx.Frame):
 	def __init__(self, parent, manager, su):
-		super(newDesignWindow, self).__init__(parent, title='Order from Spectrom')
+		super(newDesignWindow, self).__init__(parent, title='Order from Spectrom', style=wx.CLOSE_BOX|wx.SYSTEM_MENU|wx.STAY_ON_TOP|wx.FRAME_NO_TASKBAR|wx.CAPTION)
 		p = wx.Panel(self)
 		self.SetSizer(wx.BoxSizer())
 		self.GetSizer().Add(p, 1, wx.EXPAND)
