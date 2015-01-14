@@ -1128,6 +1128,7 @@ class SceneView(openglGui.glGuiPanel):
 
 					varying float light_amount;
 					varying vec3 vertex_position;
+					varying vec3 vertex_normal;
 
 					void main(void)
 					{
@@ -1136,6 +1137,7 @@ class SceneView(openglGui.glGuiPanel):
 
 						vertex_position = vec3(model_matrix * gl_Vertex);
 						//gl_Position = gl_ProjectionMatrix * (model_matrix * gl_Vertex);
+						vertex_normal = normalize(mat3(model_matrix) * vec3(gl_Normal));
 
 						light_amount = abs(dot(normalize(gl_NormalMatrix * gl_Normal), normalize(gl_LightSource[0].position.xyz)));
 						light_amount += 0.2;
@@ -1150,6 +1152,7 @@ class SceneView(openglGui.glGuiPanel):
 
 					varying float light_amount;
 					varying vec3 vertex_position;
+					varying vec3 vertex_normal;
 
 					vec4 getDistanceColor(void)
 					{
@@ -1187,8 +1190,13 @@ class SceneView(openglGui.glGuiPanel):
 
 					void main(void)
 					{
-						int layer = int(vertex_position.z / layer_height);
-						float selectDim = (layer >= min_selected && layer < max_selected) ? 0.5 : 1.0;
+						float z = vertex_position.z;
+						// combat Z-fighting by using small offsets on flat surfaces
+						if (abs(vertex_normal.z - 1.0) < 0.001) z -= 0.001;
+						if (abs(vertex_normal.z + 1.0) < 0.001) z += 0.001;
+						int layer = int(z / layer_height);
+						float selectDim = (layer >= min_selected && layer < max_selected ||
+										max_selected >= layer_starts[num_layers - 1] && layer >= layer_starts[num_layers - 1]) ? 0.5 : 1.0;
 						vec4 color = getLayerColor(layer);
 						gl_FragColor = vec4(color.rgb * (selectDim * light_amount), color.a);
 					}
