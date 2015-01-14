@@ -205,27 +205,28 @@ class configureWindow(wx.Frame):
 		self._callback = callback
 		self.abort = False
 
-		self._firstName = wx.TextCtrl(self._panel, -1, profile.getPreference("spectrom_firstname") or _("First Name"))
-		self._lastName = wx.TextCtrl(self._panel, -1, profile.getPreference("spectrom_lastname") or _("Last Name"))
-		self._emailAddress = wx.TextCtrl(self._panel, -1, profile.getPreference("spectrom_email") or _("Email"))
-		self._companyName = wx.TextCtrl(self._panel, -1, profile.getPreference("spectrom_companyname") or _("Company (optional)"))
+		self._firstName = wx.TextCtrl(self._panel, -1, profile.getPreference("spectrom_firstname") or '')
+		self._lastName = wx.TextCtrl(self._panel, -1, profile.getPreference("spectrom_lastname") or '')
+		self._emailAddress = wx.TextCtrl(self._panel, -1, profile.getPreference("spectrom_email") or '')
+		self._companyName = wx.TextCtrl(self._panel, -1, profile.getPreference("spectrom_companyname") or '')
 		self._doneButton = wx.Button(self._panel, -1, _("Submit"))
 
-		self._panel._sizer = wx.GridBagSizer(5, 5)
+		self._panel._sizer = wx.GridBagSizer(8, 3)
 		self._panel.SetSizer(self._panel._sizer)
 
-		self._panel._sizer.Add(wx.StaticBitmap(self._panel, -1, wx.Bitmap(getPathForImage('spectrom-text.png'))), (0,0), span=(1,4), flag=wx.ALIGN_CENTRE | wx.ALL, border=5)
-		self._panel._sizer.Add(wx.StaticLine(self._panel, -1), (1,0), span=(1,4), flag=wx.EXPAND | wx.ALL)
-		self._panel._sizer.Add(self._firstName, (2, 1), flag=wx.EXPAND | wx.ALL)
-		self._panel._sizer.Add(self._lastName, (3, 1), flag=wx.EXPAND | wx.ALL)
-		self._panel._sizer.Add(self._emailAddress, (4, 1), flag=wx.EXPAND | wx.ALL)
-		self._panel._sizer.Add(self._companyName, (5, 1), flag=wx.EXPAND | wx.ALL)
-		self._panel._sizer.Add(wx.StaticLine(self._panel, -1), (6,0), span=(1,4), flag=wx.EXPAND | wx.ALL)
-		self._panel._sizer.Add(self._doneButton, (7, 1), flag=wx.EXPAND | wx.ALL)
+		self._panel._sizer.Add(wx.StaticBitmap(self._panel, -1, wx.Bitmap(getPathForImage('spectrom-text.png'))), (0,0), span=(1,3), flag=wx.ALIGN_CENTRE | wx.ALL, border=5)
+		self._panel._sizer.Add(wx.StaticLine(self._panel, -1), (1,0), span=(1,3), flag=wx.EXPAND)
+		self._panel._sizer.Add(wx.StaticText(self._panel, -1, _('First Name')), (2, 0), flag=wx.ALIGN_LEFT|wx.LEFT, border=5)
+		self._panel._sizer.Add(self._firstName, (2, 1), span=(1,2), flag=wx.EXPAND|wx.RIGHT, border=5)
+		self._panel._sizer.Add(wx.StaticText(self._panel, -1, _('Last Name')), (3, 0), flag=wx.ALIGN_LEFT|wx.LEFT, border=5)
+		self._panel._sizer.Add(self._lastName, (3, 1), span=(1,2), flag=wx.EXPAND|wx.RIGHT, border=5)
+		self._panel._sizer.Add(wx.StaticText(self._panel, -1, _('Email Address')), (4, 0), flag=wx.ALIGN_LEFT|wx.LEFT, border=5)
+		self._panel._sizer.Add(self._emailAddress, (4, 1), span=(1,2), flag=wx.EXPAND|wx.RIGHT, border=5)
+		self._panel._sizer.Add(wx.StaticText(self._panel, -1, _('Company Name')), (5, 0), flag=wx.ALIGN_LEFT|wx.LEFT, border=5)
+		self._panel._sizer.Add(self._companyName, (5, 1), span=(1,2), flag=wx.EXPAND|wx.RIGHT, border=5)
+		self._panel._sizer.Add(wx.StaticLine(self._panel, -1), (6, 0), span=(1,3), flag=wx.EXPAND)
+		self._panel._sizer.Add(self._doneButton, (7, 1), flag=wx.EXPAND|wx.LEFT|wx.BOTTOM|wx.RIGHT, border=5)
 
-		self.Bind(wx.EVT_TEXT, self.OnEnterEmail, self._emailAddress)
-		self.Bind(wx.EVT_TEXT, self.OnEnterFirst, self._firstName)
-		self.Bind(wx.EVT_TEXT, self.OnEnterLast, self._lastName)
 		self.Bind(wx.EVT_BUTTON, self.OnSubmit, self._doneButton)
 
 		self.Fit()
@@ -234,31 +235,25 @@ class configureWindow(wx.Frame):
 		self._firstName.SetFocus()
 		self._firstName.SelectAll()
 
-	def OnEnterEmail(self, e):
-		self._emailAddress.SetBackgroundColour(wx.NullColor)
-
-	def OnEnterFirst(self, e):
-		self._firstName.SetBackgroundColour(wx.NullColor)
-
-	def OnEnterLast(self, e):
-		self._lastName.SetBackgroundColour(wx.NullColor)
-
 	def OnSubmit(self, e):
-		passed = True;
+		message = ""
 		first = self._firstName.GetValue().strip()
 		last = self._lastName.GetValue().strip()
 		email = self._emailAddress.GetValue().strip()
-		if not first or ' ' in first:
-			self._firstName.SetBackgroundColour("red")
-			passed = False;
-		if not last or ' ' in last:
-			self._lastName.SetBackgroundColour("red")
-			passed = False;
+		if not first:
+			message += _("Please give a first name\n")
+		elif first == 'First Name':
+			message += _("First name cannot be 'First Name'\n")
+		if not last:
+			message += _("Please give a last name\n")
+		elif last == 'Last Name':
+			message += _("Last name cannot be 'Last Name'\n")
 		if not EMAIL_RE.match(email):
-			self._emailAddress.SetBackgroundColour("red")
-			passed = False;
+			message += _("Please enter a valid email\n")
 		
-		if passed:
+		if message:
+			wx.MessageBox(message, _("Invalid Entry"), wx.ICON_ERROR | wx.OK)
+		else:
 			profile.putPreference('spectrom_firstname', first)
 			profile.putPreference('spectrom_lastname', last)
 			profile.putPreference('spectrom_email', email)
@@ -278,17 +273,17 @@ class newDesignWindow(wx.Frame):
 		self._manager = manager
 		self._su = su
 
-		self._designName = wx.TextCtrl(p, -1, _("Design name"))
+		self._designName = wx.TextCtrl(p, -1, '')
 		self._shareButton = wx.Button(p, -1, _("Order"))
 
-		s = wx.GridBagSizer(5, 5)
+		s = wx.GridBagSizer(4, 3)
 		p.SetSizer(s)
 
 		s.Add(wx.StaticBitmap(p, -1, wx.Bitmap(getPathForImage('spectrom-text.png'))), (0,0), span=(1,3), flag=wx.ALIGN_CENTRE | wx.ALL, border=5)
-		s.Add(wx.StaticText(p, -1, _("Design name:")), (1, 0), flag=wx.LEFT|wx.TOP, border=5)
+		s.Add(wx.StaticText(p, -1, _("Object name:")), (1, 0), flag=wx.LEFT|wx.TOP, border=5)
 		s.Add(self._designName, (1, 1), span=(1,2), flag=wx.EXPAND|wx.LEFT|wx.TOP|wx.RIGHT, border=5)
 		s.Add(wx.StaticLine(p, -1), (2,0), span=(1,3), flag=wx.EXPAND|wx.ALL)
-		s.Add(self._shareButton, (3, 1), flag=wx.BOTTOM, border=15)
+		s.Add(self._shareButton, (3, 1), flag=wx.LEFT|wx.BOTTOM|wx.RIGHT, border=5)
 
 		self.Bind(wx.EVT_BUTTON, self.OnShare, self._shareButton)
 
@@ -300,7 +295,7 @@ class newDesignWindow(wx.Frame):
 
 	def OnShare(self, e):
 		if self._designName.GetValue() == '':
-			wx.MessageBox(_("The name cannot be empty"), _("New design error."), wx.OK | wx.ICON_ERROR)
+			wx.MessageBox(_("The name cannot be empty"), _("Error"), wx.OK | wx.ICON_ERROR)
 			self._designName.SetFocus()
 			return
 		self._manager.createNewOrder(self._designName.GetValue())
