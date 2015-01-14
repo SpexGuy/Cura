@@ -17,7 +17,7 @@ class aboutWindow(wx.Frame):
 		s = wx.BoxSizer(wx.VERTICAL)
 		p.SetSizer(s)
 
-		title = wx.StaticText(p, -1, 'Cura')
+		title = wx.StaticText(p, -1, 'Spectrom Cura')
 		title.SetFont(wx.Font(18, wx.SWISS, wx.NORMAL, wx.BOLD))
 		s.Add(title, flag=wx.ALIGN_CENTRE|wx.EXPAND|wx.BOTTOM, border=5)
 
@@ -27,6 +27,8 @@ class aboutWindow(wx.Frame):
 
 		s.Add(wx.StaticText(p, -1, 'Cura is built with the following components:'), flag=wx.TOP, border=10)
 		self.addComponent('Cura', 'Graphical user interface', 'AGPLv3', 'https://github.com/daid/Cura')
+		self.addComponent('CuraEngine', 'GCode Generator', 'AGPLv3', 'https://github.com/Ultimaker/CuraEngine')
+		self.addComponent('Clipper', 'Polygon clipping library', 'Boost', 'http://www.angusj.com/delphi/clipper.php')
 
 		self.addComponent('Python 2.7', 'Framework', 'Python', 'http://python.org/')
 		self.addComponent('wxPython', 'GUI Framework', 'wxWindows', 'http://www.wxpython.org/')
