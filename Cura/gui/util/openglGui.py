@@ -89,6 +89,7 @@ class glGuiContainer(glGuiControl):
 		if not layout:
 			layout = glGuiLayoutButtons
 		self._glGuiControlList = []
+		self._hidden = False
 		layout(self)
 		super(glGuiContainer, self).__init__(parent, pos)
 
@@ -115,7 +116,12 @@ class glGuiContainer(glGuiControl):
 				handled = True
 		return handled
 
+	def setHidden(self, hidden):
+		self._hidden = hidden
+
 	def draw(self):
+		if self._hidden:
+			return
 		for ctrl in self._glGuiControlList:
 			ctrl.draw()
 
@@ -1304,6 +1310,7 @@ class glRangeSelect(glGuiControl):
 
 	def deselectAll(self):
 		self._baseSelect = self._endSelect
+		self._callback()
 
 	def setHidden(self, value):
 		self._hidden = value

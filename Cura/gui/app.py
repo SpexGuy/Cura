@@ -17,8 +17,8 @@ except ImportError:
 class CuraApp(wx.App):
 	def __init__(self, files):
 		if platform.system() == "Windows" and not 'PYCHARM_HOSTED' in os.environ:
-			#super(CuraApp, self).__init__(redirect=True, filename='output.txt')
-			super(CuraApp, self).__init__(redirect=False)
+			super(CuraApp, self).__init__(redirect=True, filename='output.txt')
+			#super(CuraApp, self).__init__(redirect=False)
 		else:
 			super(CuraApp, self).__init__(redirect=False)
 

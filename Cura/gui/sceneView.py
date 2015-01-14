@@ -99,8 +99,8 @@ class SceneView(openglGui.glGuiPanel):
 		openglGui.glLabel(self.scaleForm, _("Uniform scale"), (0,8))
 		self.scaleUniform = openglGui.glCheckbox(self.scaleForm, True, (1,8), None)
 
-		self.layerColors = openglGui.glColorRangeSelect(self, (-1.5, -3), 0, 1950, (1,1,1), lambda: self.updateColor())
-		self.layerColorer = openglGui.glColorPicker(self, (-2, -5.4), (1,1,1), lambda: self.layerColors.setColor(self.layerColorer.getColor()))
+		self.layerColors = openglGui.glColorRangeSelect(self, (-1, -1), 0, 1950, (1,1,1), lambda: self.updateColor())
+		self.layerColorer = openglGui.glColorPicker(self, (-1.5, -3), (1,1,1), lambda: self.layerColors.setColor(self.layerColorer.getColor()))
 
 		self.notification = openglGui.glNotification(self, (0, 0))
 
@@ -650,8 +650,11 @@ class SceneView(openglGui.glGuiPanel):
 			tallestObject = max(objects, key=lambda obj : obj.getSize()[2])
 			numLayers = int(math.ceil(tallestObject.getSize()[2] / self._layerHeight))
 			self.layerColors.setRange(0, max(numLayers, 1))
+			self.layerColors.setHidden(False)
+			self.layerColorer.setHidden(False)
 		else:
-			self.layerColors.setRange(0, 1)
+			self.layerColors.setHidden(True)
+			self.layerColorer.setHidden(True)
 
 	def OnKeyChar(self, keyCode):
 		if keyCode == wx.WXK_DELETE or keyCode == wx.WXK_NUMPAD_DELETE or (keyCode == wx.WXK_BACK and sys.platform.startswith("darwin")):
@@ -741,6 +744,7 @@ class SceneView(openglGui.glGuiPanel):
 		self._mouseClickFocus = self._focusObj
 		if e.ButtonDClick():
 			self._mouseState = 'doubleClick'
+			self.layerColors.deselectAll()
 		else:
 			if self._mouseState == 'dragObject' and self._selectedObj is not None:
 				self._scene.pushFree(self._selectedObj)
@@ -756,6 +760,8 @@ class SceneView(openglGui.glGuiPanel):
 				if self._focusObj is not None:
 					self._selectObject(self._focusObj, False)
 					self.QueueRefresh()
+				else:
+					self.layerColors.deselectAll()
 
 	def OnMouseUp(self, e):
 		if e.LeftIsDown() or e.MiddleIsDown() or e.RightIsDown():
