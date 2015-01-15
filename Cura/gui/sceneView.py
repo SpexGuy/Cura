@@ -432,13 +432,13 @@ class SceneView(openglGui.glGuiPanel):
 		result = self._engine.getResult()
 		layers = result.waitForGCodeLayers(progressCallback)
 		colorCode = bigDataStorage.BigDataStorage()
-		colorCode.write(';LAYERS:\n')
-		for n in xrange(len(layers)):
-			extrusions = map(lambda stroke: sum(map(lambda x: x if x > 0 else 0, stroke['extrusion'])), layers[n])
-			elen = sum(extrusions)
-			colorCode.write(';  %d: ' % (n))
-			colorCode.write(str(extrusions))
-			colorCode.write(' (%f)\n' % (elen))
+#		colorCode.write(';LAYERS:\n')
+#		for n in xrange(len(layers)):
+#			extrusions = map(lambda stroke: sum(stroke['extrusion']), layers[n])
+#			elen = sum(extrusions)
+#			colorCode.write(';  %d: ' % (n))
+#			colorCode.write(str(extrusions))
+#			colorCode.write(' (%f)\n' % (elen))
 		colorCode.write(';COLORS:\n')
 		for n in xrange(len(self._colorLayers)):
 			colorCode.write(';  %d: %02x%02x%02x\n' % (self._colorLayers[n], self._colorColors[n][0] * 255, self._colorColors[n][1] * 255, self._colorColors[n][2] * 255))
@@ -456,10 +456,10 @@ class SceneView(openglGui.glGuiPanel):
 			y = (maxColor-color[2])/maxColor if maxColor != 0 else 0
 			k = 1-maxColor
 			# Round values for boolean markers
-			c = 255 if c > 0.5 else 0
-			m = 255 if m > 0.5 else 0
-			y = 255 if y > 0.5 else 0
-			k = 255 if k > 0.5 else 0
+			#c = 255 if c > 0.5 else 0
+			#m = 255 if m > 0.5 else 0
+			#y = 255 if y > 0.5 else 0
+			#k = 255 if k > 0.5 else 0
 			# Find the start and end layer
 			layer = self._colorLayers[n]+1
 			# Truncate to max layer
@@ -470,12 +470,13 @@ class SceneView(openglGui.glGuiPanel):
 			e = sum(map(
 				lambda lyr:
 					sum(map(lambda stroke:
-						sum(map(lambda x: x if x > 0 else 0, stroke['extrusion'])),
+						sum(stroke['extrusion']),
 					lyr)),
 				layers[lastLayer:layer]))
-			e *= 48.23 # convert to ESteps
+			#e *= 48.23 # convert to ESteps
 			# Add the instruction
-			colorCode.write("G1 C%d M%d Y%d K%d E%d ;Layers %d to %d\n" % (c, m, y, k, e, lastLayer, layer))
+			print e
+			colorCode.write("G1 C%01.4d M%01.4d Y%01.4d K%01.4d E%.2f ;Layers %d to %d\n" % (c, m, y, k, e, lastLayer, layer))
 			lastLayer = layer
 			# Done if truncated
 			if truncated:
