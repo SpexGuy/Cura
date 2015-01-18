@@ -1,3 +1,4 @@
+import sys
 import cStringIO as StringIO
 
 class BigDataStorage(object):
@@ -12,7 +13,7 @@ class BigDataStorage(object):
 
 	def write(self, data):
 		self._active.write(data)
-		if self._active.tell() > 1024 * 1024 * 100:
+		if self._active.tell() > 1024 * 1024 * 50:
 			self._active = StringIO.StringIO()
 			self._list.append(self._active)
 
@@ -21,24 +22,29 @@ class BigDataStorage(object):
 		self._active.seek(0)
 		self._read_index = 0
 
+	def activeRead(self, size=None):
+		return self._active.read(size) if size != None else self._active.read()
+
 	def read(self, size=None):
-		ret = self._active.read(size)
+		ret = self.activeRead(size)
 		if ret == '':
 			if self._read_index + 1 < len(self._list):
 				self._read_index += 1
 				self._active = self._list[self._read_index]
 				self._active.seek(0)
-				ret = self._active.read(size)
+				ret = self.activeRead(size)
 		return ret
 
-	def replaceAtStart(self, key, value):
+	def replaceAtStart(self, dictionary):
 		data = self._list[0].getvalue()
 		block0 = data[0:2048]
-		value = (value + ' ' * len(key))[:len(key)]
-		block0 = block0.replace(key, value)
+		block1 = StringIO.StringIO()
 		self._list[0] = StringIO.StringIO()
+		block1.write(data[2048:])
+		self._list.insert(1, block1)
+		for key, value in dictionary.items():
+			block0 = block0.replace(key, str(value))
 		self._list[0].write(block0)
-		self._list[0].write(data[2048:])
 
 	def __len__(self):
 		ret = 0
@@ -71,6 +77,9 @@ class BigDataStorage(object):
 		if self._iter_index < len(self._list):
 			pos += self._list[self._iter_index].tell()
 		return pos
+
+	def close(self):
+		pass
 
 	def clone(self):
 		clone = BigDataStorage()

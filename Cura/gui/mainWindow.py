@@ -25,7 +25,11 @@ from Cura.util import version
 import platform
 from Cura.util import meshLoader
 
-from wx.lib.pubsub import Publisher
+try:
+	#MacOS release currently lacks some wx components, like the Publisher.
+	from wx.lib.pubsub import Publisher
+except:
+	Publisher = None
 
 class mainWindow(wx.Frame):
 	def __init__(self):
@@ -89,6 +93,10 @@ class mainWindow(wx.Frame):
 		i = self.fileMenu.Append(-1, _("Save Profile..."))
 		self.normalModeOnlyItems.append(i)
 		self.Bind(wx.EVT_MENU, self.OnSaveProfile, i)
+		if version.isDevVersion():
+			i = self.fileMenu.Append(-1, "Save difference from default...")
+			self.normalModeOnlyItems.append(i)
+			self.Bind(wx.EVT_MENU, self.OnSaveDifferences, i)
 		i = self.fileMenu.Append(-1, _("Load Profile from GCode..."))
 		self.normalModeOnlyItems.append(i)
 		self.Bind(wx.EVT_MENU, self.OnLoadProfileFromGcode, i)
@@ -173,8 +181,6 @@ class mainWindow(wx.Frame):
 		self.normalModeOnlyItems.append(i)
 		self.Bind(wx.EVT_MENU, self.OnExpertOpen, i)
 		expertMenu.AppendSeparator()
-		i = expertMenu.Append(-1, _("Run first run wizard..."))
-		self.Bind(wx.EVT_MENU, self.OnFirstRunWizard, i)
 		self.bedLevelWizardMenuItem = expertMenu.Append(-1, _("Run bed leveling wizard..."))
 		self.Bind(wx.EVT_MENU, self.OnBedLevelWizard, self.bedLevelWizardMenuItem)
 		self.headOffsetWizardMenuItem = expertMenu.Append(-1, _("Run head offset wizard..."))
@@ -201,17 +207,17 @@ class mainWindow(wx.Frame):
 		self.rightPane = wx.Panel(self.splitter, style=wx.BORDER_NONE)
 		self.splitter.Bind(wx.EVT_SPLITTER_DCLICK, lambda evt: evt.Veto())
 
+		#Preview window
+		self.scene = sceneView.SceneView(self.rightPane)
+
 		##Gui components##
-		self.simpleSettingsPanel = simpleMode.simpleModePanel(self.leftPane, lambda : self.scene.sceneUpdated())
-		self.normalSettingsPanel = normalSettingsPanel(self.leftPane, lambda : self.scene.sceneUpdated())
+		self.simpleSettingsPanel = simpleMode.simpleModePanel(self.leftPane, self.scene.sceneUpdated)
+		self.normalSettingsPanel = normalSettingsPanel(self.leftPane, self.scene.sceneUpdated)
 
 		self.leftSizer = wx.BoxSizer(wx.VERTICAL)
 		self.leftSizer.Add(self.simpleSettingsPanel, 1)
 		self.leftSizer.Add(self.normalSettingsPanel, 1, wx.EXPAND)
 		self.leftPane.SetSizer(self.leftSizer)
-
-		#Preview window
-		self.scene = sceneView.SceneView(self.rightPane)
 
 		#Main sizer, to position the preview window, buttons and tab control
 		sizer = wx.BoxSizer()
@@ -276,7 +282,8 @@ class mainWindow(wx.Frame):
 		self.updateSliceMode()
 		self.scene.SetFocus()
 		self.dialogframe = None
-		Publisher().subscribe(self.onPluginUpdate, "pluginupdate")
+		if Publisher is not None:
+			Publisher().subscribe(self.onPluginUpdate, "pluginupdate")
 
 	def onPluginUpdate(self,msg): #receives commands from the plugin thread
 		cmd = str(msg.data).split(";")
@@ -362,7 +369,7 @@ class mainWindow(wx.Frame):
 			# Enabled sash
 			self.splitter.SetSashSize(4)
 		self.defaultFirmwareInstallMenuItem.Enable(firmwareInstall.getDefaultFirmware() is not None)
-		if profile.getMachineSetting('machine_type') == 'ultimaker2':
+		if profile.getMachineSetting('machine_type').startswith('ultimaker2'):
 			self.bedLevelWizardMenuItem.Enable(False)
 			self.headOffsetWizardMenuItem.Enable(False)
 		if int(profile.getMachineSetting('extruder_amount')) < 2:
@@ -392,8 +399,6 @@ class mainWindow(wx.Frame):
 		prefDialog.Raise()
 
 	def OnDropFiles(self, files):
-		if len(files) > 0:
-			self.updateProfileToAllControls()
 		self.scene.loadFiles(files)
 
 	def OnModelMRU(self, e):
@@ -463,7 +468,8 @@ class mainWindow(wx.Frame):
 			self.Bind(wx.EVT_MENU, lambda e: self.OnSelectMachine(e.GetId() - 0x1000), i)
 
 		self.machineMenu.AppendSeparator()
-
+		i = self.machineMenu.Append(-1, _("Add new machine..."))
+		self.Bind(wx.EVT_MENU, self.OnAddNewMachine, i)
 		i = self.machineMenu.Append(-1, _("Machine settings..."))
 		self.Bind(wx.EVT_MENU, self.OnMachineSettings, i)
 
@@ -511,10 +517,20 @@ class mainWindow(wx.Frame):
 		dlg=wx.FileDialog(self, _("Select profile file to save"), os.path.split(profile.getPreference('lastFile'))[0], style=wx.FD_SAVE)
 		dlg.SetWildcard("ini files (*.ini)|*.ini")
 		if dlg.ShowModal() == wx.ID_OK:
-			profileFile = dlg.GetPath()
-			if not profileFile.lower().endswith('.ini'): #hack for linux, as for some reason the .ini is not appended.
-				profileFile += '.ini'
-			profile.saveProfile(profileFile)
+			profile_filename = dlg.GetPath()
+			if not profile_filename.lower().endswith('.ini'): #hack for linux, as for some reason the .ini is not appended.
+				profile_filename += '.ini'
+			profile.saveProfile(profile_filename)
+		dlg.Destroy()
+
+	def OnSaveDifferences(self, e):
+		dlg=wx.FileDialog(self, _("Select profile file to save"), os.path.split(profile.getPreference('lastFile'))[0], style=wx.FD_SAVE)
+		dlg.SetWildcard("ini files (*.ini)|*.ini")
+		if dlg.ShowModal() == wx.ID_OK:
+			profile_filename = dlg.GetPath()
+			if not profile_filename.lower().endswith('.ini'): #hack for linux, as for some reason the .ini is not appended.
+				profile_filename += '.ini'
+			profile.saveProfileDifferenceFromDefault(profile_filename)
 		dlg.Destroy()
 
 	def OnResetProfile(self, e):
@@ -531,6 +547,14 @@ class mainWindow(wx.Frame):
 
 	def OnNormalSwitch(self, e):
 		profile.putPreference('startMode', 'Normal')
+		dlg = wx.MessageDialog(self, _("Copy the settings from quickprint to your full settings?\n(This will overwrite any full setting modifications you have)"), _("Profile copy"), wx.YES_NO | wx.ICON_QUESTION)
+		result = dlg.ShowModal() == wx.ID_YES
+		dlg.Destroy()
+		if result:
+			profile.resetProfile()
+			for k, v in self.simpleSettingsPanel.getSettingOverrides().items():
+				profile.putProfileSetting(k, v)
+			self.updateProfileToAllControls()
 		self.updateSliceMode()
 
 	def OnDefaultMarlinFirmware(self, e):
@@ -549,11 +573,12 @@ class mainWindow(wx.Frame):
 			#For some reason my Ubuntu 10.10 crashes here.
 			firmwareInstall.InstallFirmware(self, filename)
 
-	def OnFirstRunWizard(self, e):
+	def OnAddNewMachine(self, e):
 		self.Hide()
-		configWizard.configWizard()
+		configWizard.ConfigWizard(True)
 		self.Show()
 		self.reloadSettingPanels()
+		self.updateMachineMenu()
 
 	def OnSelectMachine(self, index):
 		profile.setActiveMachine(index)

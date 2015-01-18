@@ -52,6 +52,7 @@ class SceneView(openglGui.glGuiPanel):
 		self._viewTarget = numpy.array([0,0,0], numpy.float32)
 		self._animView = None
 		self._animZoom = None
+		self._lastObjectSink = None
 		self._platformMesh = {}
 		self._platformTexture = None
 		self._isSimpleMode = True
@@ -297,6 +298,19 @@ class SceneView(openglGui.glGuiPanel):
 				else:
 					drive = drives[0]
 				filename = self._scene._objectList[0].getName() + profile.getGCodeExtension()
+				
+				#check if the file is part of the root folder. If so, create folders on sd card to get the same folder hierarchy.
+				repDir = profile.getPreference("sdcard_rootfolder")
+				if os.path.exists(repDir) and os.path.isdir(repDir):
+					repDir = os.path.abspath(repDir)
+					originFilename = os.path.abspath( self._scene._objectList[0].getOriginFilename() )
+					if os.path.dirname(originFilename).startswith(repDir):
+						filename = os.path.splitext(originFilename[len(repDir):])[0] + profile.getGCodeExtension()
+						sdPath = os.path.dirname(os.path.join( drive[1], filename))
+						if not os.path.exists(sdPath):
+							print "Creating replication directory:", sdPath
+							os.makedirs(sdPath)
+
 				threading.Thread(target=self._saveGCode,args=(drive[1] + filename, drive[1])).start()
 			elif connectionGroup is not None:
 				connections = connectionGroup.getAvailableConnections()
@@ -691,7 +705,13 @@ class SceneView(openglGui.glGuiPanel):
 		self.sceneUpdated()
 
 	def sceneUpdated(self):
-		self._sceneUpdateTimer.Start(500, True)
+
+		objectSink = profile.getProfileSettingFloat("object_sink")
+		if self._lastObjectSink != objectSink:
+			self._lastObjectSink = objectSink
+			self._scene.updateHeadSize()
+
+		wx.CallAfter(self._sceneUpdateTimer.Start, 500, True)
 		self._engine.abortEngine()
 		self._scene.updateSizeOffsets()
 		self.updateLayerRange()
@@ -699,10 +719,9 @@ class SceneView(openglGui.glGuiPanel):
 
 	def _onRunEngine(self, e):
 		if self._isSimpleMode:
-			self.GetTopLevelParent().simpleSettingsPanel.setupSlice()
-		self._engine.runEngine(self._scene)
-		if self._isSimpleMode:
-			profile.resetTempOverride()
+			self._engine.runEngine(self._scene, self.GetTopLevelParent().simpleSettingsPanel.getSettingOverrides())
+		else:
+			self._engine.runEngine(self._scene)
 
 	def _updateEngineProgress(self, progressValue):
 		result = self._engine.getResult()
@@ -799,6 +818,8 @@ class SceneView(openglGui.glGuiPanel):
 		self._objColors[2] = profile.getPreferenceColour('model_colour3')
 		self._objColors[3] = profile.getPreferenceColour('model_colour4')
 		self._scene.updateMachineDimensions()
+		if self._zoom > numpy.max(self._machineSize) * 3:
+			self._animZoom = openglGui.animation(self, self._zoom, numpy.max(self._machineSize) * 3, 0.5)
 		self.updateModelSettingsToControls()
 		self.updateLayerRange()
 
@@ -1503,41 +1524,71 @@ class SceneView(openglGui.glGuiPanel):
 
 		size = [profile.getMachineSettingFloat('machine_width'), profile.getMachineSettingFloat('machine_depth'), profile.getMachineSettingFloat('machine_height')]
 
-		machine = profile.getMachineSetting('machine_type')
-		if machine.startswith('ultimaker'):
-			if machine not in self._platformMesh:
-				meshes = meshLoader.loadMeshes(resources.getPathForMesh(machine + '_platform.stl'))
+		machine_type = profile.getMachineSetting('machine_type')
+		if machine_type not in self._platformMesh:
+			self._platformMesh[machine_type] = None
+
+			filename = None
+			texture_name = None
+			offset = [0,0,0]
+			texture_offset = [0,0,0]
+			texture_scale = 1.0
+			if machine_type == 'ultimaker2' or machine_type == 'ultimaker2extended':
+				filename = resources.getPathForMesh('ultimaker2_platform.stl')
+				offset = [-9,-37,145]
+				texture_name = 'Ultimaker2backplate.png'
+				texture_offset = [9,150,-5]
+			elif machine_type == 'ultimaker2go':
+				filename = resources.getPathForMesh('ultimaker2go_platform.stl')
+				offset = [0,-42,145]
+				texture_offset = [0,105,-5]
+				texture_name = 'Ultimaker2backplate.png'
+				texture_scale = 0.9
+			elif machine_type == 'ultimaker_plus':
+				filename = resources.getPathForMesh('ultimaker2_platform.stl')
+				offset = [0,-37,145]
+				texture_offset = [0,150,-5]
+				texture_name = 'UltimakerPlusbackplate.png'
+			elif machine_type == 'ultimaker':
+				filename = resources.getPathForMesh('ultimaker_platform.stl')
+				offset = [0,0,2.5]
+			elif machine_type == 'Witbox':
+				filename = resources.getPathForMesh('Witbox_platform.stl')
+				offset = [0,-37,145]
+
+			if filename is not None:
+				meshes = meshLoader.loadMeshes(filename)
 				if len(meshes) > 0:
-					self._platformMesh[machine] = meshes[0]
-				else:
-					self._platformMesh[machine] = None
-				if machine == 'ultimaker2' or machine == 'ultimaker_plus':
-					self._platformMesh[machine]._drawOffset = numpy.array([0,-37,145], numpy.float32)
-				else:
-					self._platformMesh[machine]._drawOffset = numpy.array([0,0,2.5], numpy.float32)
+					self._platformMesh[machine_type] = meshes[0]
+					self._platformMesh[machine_type]._drawOffset = numpy.array(offset, numpy.float32)
+					self._platformMesh[machine_type].texture = None
+					if texture_name is not None:
+						self._platformMesh[machine_type].texture = openglHelpers.loadGLTexture(texture_name)
+						self._platformMesh[machine_type].texture_offset = texture_offset
+						self._platformMesh[machine_type].texture_scale = texture_scale
+		if self._platformMesh[machine_type] is not None:
+			mesh = self._platformMesh[machine_type]
 			glColor4f(1,1,1,0.5)
 			self._objectShader.bind()
-			self._renderObject(self._platformMesh[machine], False, False)
+			self._renderObject(mesh, False, False)
 			self._objectShader.unbind()
 
 			#For the Ultimaker 2 render the texture on the back plate to show the Ultimaker2 text.
-			if machine == 'ultimaker2' or machine == 'ultimaker_plus':
-				if not hasattr(self._platformMesh[machine], 'texture'):
-					if machine == 'ultimaker2':
-						self._platformMesh[machine].texture = openglHelpers.loadGLTexture('Ultimaker2backplate.png')
-					else:
-						self._platformMesh[machine].texture = openglHelpers.loadGLTexture('UltimakerPlusbackplate.png')
-				glBindTexture(GL_TEXTURE_2D, self._platformMesh[machine].texture)
+			if mesh.texture is not None:
+				glBindTexture(GL_TEXTURE_2D, mesh.texture)
 				glEnable(GL_TEXTURE_2D)
 				glPushMatrix()
 				glColor4f(1,1,1,1)
 
-				glTranslate(0,150,-5)
+				glTranslate(mesh.texture_offset[0], mesh.texture_offset[1], mesh.texture_offset[2])
+				glScalef(mesh.texture_scale, mesh.texture_scale, mesh.texture_scale)
 				h = 50
 				d = 8
 				w = 100
 				glEnable(GL_BLEND)
-				glBlendFunc(GL_DST_COLOR, GL_ZERO)
+				glBlendFunc(GL_DST_COLOR, GL_ONE_MINUS_SRC_ALPHA)
+				glEnable(GL_ALPHA_TEST)
+				glAlphaFunc(GL_GREATER, 0.0)
 				glBegin(GL_QUADS)
 				glTexCoord2f(1, 0)
 				glVertex3f( w, 0, h)
@@ -1560,20 +1611,6 @@ class SceneView(openglGui.glGuiPanel):
 				glDisable(GL_TEXTURE_2D)
 				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 				glPopMatrix()
-				
-		elif machine.startswith('Witbox'):
-			if machine not in self._platformMesh:
-				meshes = meshLoader.loadMeshes(resources.getPathForMesh(machine + '_platform.stl'))
-				if len(meshes) > 0:
-					self._platformMesh[machine] = meshes[0]
-				else:
-					self._platformMesh[machine] = None
-				if machine == 'Witbox':
-					self._platformMesh[machine]._drawOffset = numpy.array([0,-37,145], numpy.float32)
-			glColor4f(1,1,1,0.5)
-			self._objectShader.bind()
-			self._renderObject(self._platformMesh[machine], False, False)
-			self._objectShader.unbind()
 		else:
 			glColor4f(0,0,0,1)
 			glLineWidth(3)

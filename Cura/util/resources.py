@@ -32,7 +32,8 @@ else:
 def getPathForResource(dir, subdir, resource_name):
 	assert os.path.isdir(dir), "{p} is not a directory".format(p=dir)
 	path = os.path.normpath(os.path.join(dir, subdir, resource_name))
-	assert os.path.isfile(path), "{p} is not a file.".format(p=path)
+	if not os.path.isfile(path):
+		return None
 	return path
 
 def getPathForImage(name):
@@ -47,6 +48,24 @@ def getPathForFirmware(name):
 def getDefaultMachineProfiles():
 	path = os.path.normpath(os.path.join(resourceBasePath, 'machine_profiles', '*.ini'))
 	return glob.glob(path)
+
+def getSimpleModeProfiles():
+	path = os.path.normpath(os.path.join(resourceBasePath, 'quickprint', 'profiles', '*.ini'))
+	user_path = os.path.normpath(os.path.expanduser(os.path.join('~', '.Cura', 'quickprint', 'profiles')))
+	if os.path.isdir(user_path):
+		files = sorted(glob.glob(os.path.join(user_path, '*.ini')))
+		if len(files) > 0:
+			return files
+	return sorted(glob.glob(path))
+
+def getSimpleModeMaterials():
+	path = os.path.normpath(os.path.join(resourceBasePath, 'quickprint', 'materials', '*.ini'))
+	user_path = os.path.normpath(os.path.expanduser(os.path.join('~', '.Cura', 'quickprint', 'materials')))
+	if os.path.isdir(user_path):
+		files = sorted(glob.glob(os.path.join(user_path, '*.ini')))
+		if len(files) > 0:
+			return files
+	return sorted(glob.glob(path))
 
 def setupLocalization(selectedLanguage = None):
 	#Default to english
@@ -67,6 +86,8 @@ def getLanguageOptions():
 		['en', 'English'],
 		['de', 'Deutsch'],
 		['fr', 'French'],
+		['tr', 'Turkish'],
+		# ['ko', 'Korean'],
 		# ['zh', 'Chinese'],
 		# ['nl', 'Nederlands'],
 		# ['es', 'Spanish'],

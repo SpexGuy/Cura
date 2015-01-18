@@ -258,33 +258,40 @@ class FirstInfoPage(InfoPage):
 
 class PrintrbotPage(InfoPage):
 	def __init__(self, parent):
-		self._printer_info = {
-			# X, Y, Z, Filament Diameter, PrintTemperature, Print Speed, Travel Speed, Retract speed, Retract amount
-			"Original": (130, 130, 130, 2.95, 208, 40, 70, 30, 1),
-			"Simple Maker's Edition v1": (100, 100, 100, 1.75, 208, 40, 70, 30, 1),
-			"Simple Maker's Edition v2 (2013 Printrbot Simple)": (100, 100, 100, 1.75, 208, 40, 70, 30, 1),
-			"Simple Maker's Edition v3 (2014 Printrbot Simple)": (100, 100, 100, 1.75, 208, 40, 70, 30, 1),
-			"Simple Maker's Edition v4 (Model 1405)": (100, 100, 100, 1.75, 208, 40, 70, 30, 1),
-			"Simple Metal": (150, 150, 150, 1.75, 208, 40, 70, 30, 1),
-			"Jr v1": (150, 100, 80, 1.75, 208, 40, 70, 30, 1),
-			"Jr v2": (150, 150, 150, 1.75, 208, 40, 70, 30, 1),
-			"LC v2": (150, 150, 150, 1.75, 208, 40, 70, 30, 1),
-			"Plus v2": (200, 200, 200, 1.75, 208, 40, 70, 30, 1),
-			"Plus v2.1": (200, 200, 200, 1.75, 208, 40, 70, 30, 1),
-			"Plus v2.2 (Model 1404/140422)": (250, 250, 250, 1.75, 208, 40, 70, 30, 1),
-			"Plus v2.3 (Model 140501)": (250, 250, 250, 1.75, 208, 40, 70, 30, 1),
-			"Plus v2.4 (Model 140507)": (250, 250, 250, 1.75, 208, 40, 70, 30, 1),
-		}
+		self._printer_info = [
+			# X, Y, Z, Nozzle Size, Filament Diameter, PrintTemperature, Print Speed, Travel Speed, Retract speed, Retract amount, use bed level sensor
+			("Simple Metal", 150, 150, 150, 0.4, 1.75, 208, 40, 70, 30, 1, True),
+			("Metal Plus", 250, 250, 250, 0.4, 1.75, 208, 40, 70, 30, 1, True),
+			("Simple Makers Kit", 100, 100, 100, 0.4, 1.75, 208, 40, 70, 30, 1, True),
+			(":" + _("Older models"),),
+			("Original", 130, 130, 130, 0.5, 2.95, 208, 40, 70, 30, 1, False),
+			("Simple Maker's Edition v1", 100, 100, 100, 0.5, 1.75, 208, 40, 70, 30, 1, False),
+			("Simple Maker's Edition v2 (2013 Printrbot Simple)", 100, 100, 100, 0.5, 1.75, 208, 40, 70, 30, 1, False),
+			("Simple Maker's Edition v3 (2014 Printrbot Simple)", 100, 100, 100, 0.5, 1.75, 208, 40, 70, 30, 1, False),
+			("Simple Maker's Edition v4 (Model 1405)", 100, 100, 100, 0.5, 1.75, 208, 40, 70, 30, 1, False),
+			("Jr v1", 150, 100, 80, 0.5, 1.75, 208, 40, 70, 30, 1, False),
+			("Jr v2", 150, 150, 150, 0.5, 1.75, 208, 40, 70, 30, 1, False),
+			("LC v2", 150, 150, 150, 0.5, 1.75, 208, 40, 70, 30, 1, False),
+			("Plus v2", 200, 200, 200, 0.5, 1.75, 208, 40, 70, 30, 1, False),
+			("Plus v2.1", 200, 200, 200, 0.5, 1.75, 208, 40, 70, 30, 1, False),
+			("Plus v2.2 (Model 1404/140422)", 250, 250, 250, 0.5, 1.75, 208, 40, 70, 30, 1, False),
+			("Plus v2.3 (Model 140501)", 250, 250, 250, 0.5, 1.75, 208, 40, 70, 30, 1, False),
+			("Plus v2.4 (Model 140507)", 250, 250, 250, 0.5, 1.75, 208, 40, 70, 30, 1, False),
+			("Go v2 Large", 609, 305, 305, 0.5, 1.75, 208, 35, 70, 30, 1, False),
+		]
 
 		super(PrintrbotPage, self).__init__(parent, _("Printrbot Selection"))
+		self.AddBitmap(wx.Bitmap(resources.getPathForImage('Printrbot_logo.png')))
 		self.AddText(_("Select which Printrbot machine you have:"))
-		keys = self._printer_info.keys()
-		keys.sort()
 		self._items = []
-		for name in keys:
-			item = self.AddRadioButton(name)
-			item.data = self._printer_info[name]
-			self._items.append(item)
+		for printer in self._printer_info:
+			if printer[0].startswith(":"):
+				self.AddSeperator()
+				self.AddText(printer[0][1:])
+			else:
+				item = self.AddRadioButton(printer[0])
+				item.data = printer[1:]
+				self._items.append(item)
 
 	def StoreData(self):
 		profile.putMachineSetting('machine_name', 'Printrbot ???')
@@ -295,13 +302,13 @@ class PrintrbotPage(InfoPage):
 				profile.putMachineSetting('machine_width', data[0])
 				profile.putMachineSetting('machine_depth', data[1])
 				profile.putMachineSetting('machine_height', data[2])
-				profile.putProfileSetting('nozzle_size', '0.5')
-				profile.putProfileSetting('filament_diameter', data[3])
-				profile.putProfileSetting('print_temperature', data[4])
-				profile.putProfileSetting('print_speed', data[5])
-				profile.putProfileSetting('travel_speed', data[6])
-				profile.putProfileSetting('retraction_speed', data[7])
-				profile.putProfileSetting('retraction_amount', data[8])
+				profile.putProfileSetting('nozzle_size', data[3])
+				profile.putProfileSetting('filament_diameter', data[4])
+				profile.putProfileSetting('print_temperature', data[5])
+				profile.putProfileSetting('print_speed', data[6])
+				profile.putProfileSetting('travel_speed', data[7])
+				profile.putProfileSetting('retraction_speed', data[8])
+				profile.putProfileSetting('retraction_amount', data[9])
 				profile.putProfileSetting('wall_thickness', float(profile.getProfileSettingFloat('nozzle_size')) * 2)
 				profile.putMachineSetting('has_heated_bed', 'False')
 				profile.putMachineSetting('machine_center_is_zero', 'False')
@@ -310,6 +317,32 @@ class PrintrbotPage(InfoPage):
 				profile.putMachineSetting('extruder_head_size_max_x', '0')
 				profile.putMachineSetting('extruder_head_size_max_y', '0')
 				profile.putMachineSetting('extruder_head_size_height', '0')
+				if data[10]:
+					profile.setAlterationFile('start.gcode', """;Sliced at: {day} {date} {time}
+;Basic settings: Layer height: {layer_height} Walls: {wall_thickness} Fill: {fill_density}
+;Print time: {print_time}
+;Filament used: {filament_amount}m {filament_weight}g
+;Filament cost: {filament_cost}
+;M190 S{print_bed_temperature} ;Uncomment to add your own bed temperature line
+;M109 S{print_temperature} ;Uncomment to add your own temperature line
+G21        ;metric values
+G90        ;absolute positioning
+M82        ;set extruder to absolute mode
+M107       ;start with the fan off
+
+G28 X0 Y0  ;move X/Y to min endstops
+G28 Z0     ;move Z to min endstops
+G29        ;Run the auto bed leveling
+
+G1 Z15.0 F{travel_speed} ;move the platform down 15mm
+
+G92 E0                  ;zero the extruded length
+G1 F200 E3              ;extrude 3mm of feed stock
+G92 E0                  ;zero the extruded length again
+G1 F{travel_speed}
+;Put printing message on LCD screen
+M117 Printing...
+""")
 
 class OtherMachineSelectPage(InfoPage):
 	def __init__(self, parent):
@@ -388,6 +421,10 @@ class MachineSelectPage(InfoPage):
 		self.Ultimaker2Radio = self.AddRadioButton("Ultimaker2", style=wx.RB_GROUP)
 		self.Ultimaker2Radio.SetValue(True)
 		self.Ultimaker2Radio.Bind(wx.EVT_RADIOBUTTON, self.OnUltimaker2Select)
+		self.Ultimaker2ExtRadio = self.AddRadioButton("Ultimaker2extended")
+		self.Ultimaker2ExtRadio.Bind(wx.EVT_RADIOBUTTON, self.OnUltimaker2Select)
+		self.Ultimaker2GoRadio = self.AddRadioButton("Ultimaker2go")
+		self.Ultimaker2GoRadio.Bind(wx.EVT_RADIOBUTTON, self.OnUltimaker2Select)
 		self.UltimakerRadio = self.AddRadioButton("Ultimaker Original")
 		self.UltimakerRadio.Bind(wx.EVT_RADIOBUTTON, self.OnUltimakerSelect)
 		self.UltimakerOPRadio = self.AddRadioButton("Ultimaker Original+")
@@ -431,14 +468,29 @@ class MachineSelectPage(InfoPage):
 
 	def StoreData(self):
 		profile.putProfileSetting('retraction_enable', 'True')
-		if self.Ultimaker2Radio.GetValue():
-			profile.putMachineSetting('machine_width', '230')
-			profile.putMachineSetting('machine_depth', '225')
-			profile.putMachineSetting('machine_height', '205')
-			profile.putMachineSetting('machine_name', 'ultimaker2')
-			profile.putMachineSetting('machine_type', 'ultimaker2')
+		if self.Ultimaker2Radio.GetValue() or self.Ultimaker2GoRadio.GetValue() or self.Ultimaker2ExtRadio.GetValue():
+			if self.Ultimaker2Radio.GetValue():
+				profile.putMachineSetting('machine_width', '230')
+				profile.putMachineSetting('machine_depth', '225')
+				profile.putMachineSetting('machine_height', '205')
+				profile.putMachineSetting('machine_name', 'ultimaker2')
+				profile.putMachineSetting('machine_type', 'ultimaker2')
+				profile.putMachineSetting('has_heated_bed', 'True')
+			if self.Ultimaker2GoRadio.GetValue():
+				profile.putMachineSetting('machine_width', '120')
+				profile.putMachineSetting('machine_depth', '120')
+				profile.putMachineSetting('machine_height', '115')
+				profile.putMachineSetting('machine_name', 'ultimaker2go')
+				profile.putMachineSetting('machine_type', 'ultimaker2go')
+				profile.putMachineSetting('has_heated_bed', 'False')
+			if self.Ultimaker2ExtRadio.GetValue():
+				profile.putMachineSetting('machine_width', '230')
+				profile.putMachineSetting('machine_depth', '225')
+				profile.putMachineSetting('machine_height', '305')
+				profile.putMachineSetting('machine_name', 'ultimaker2extended')
+				profile.putMachineSetting('machine_type', 'ultimaker2extended')
+				profile.putMachineSetting('has_heated_bed', 'False')
 			profile.putMachineSetting('machine_center_is_zero', 'False')
-			profile.putMachineSetting('has_heated_bed', 'True')
 			profile.putMachineSetting('gcode_flavor', 'UltiGCode')
 			profile.putMachineSetting('extruder_head_size_min_x', '40.0')
 			profile.putMachineSetting('extruder_head_size_min_y', '10.0')
@@ -980,12 +1032,17 @@ class LulzbotReadyPage(InfoPage):
 		self.AddText(_('Cura is now ready to be used with your Lulzbot.'))
 		self.AddSeperator()
 
-class configWizard(wx.wizard.Wizard):
+class ConfigWizard(wx.wizard.Wizard):
 	def __init__(self, addNew = False):
-		super(configWizard, self).__init__(None, -1, _("Configuration Wizard"))
+		super(ConfigWizard, self).__init__(None, -1, _("Configuration Wizard"))
+
+		self._old_machine_index = int(profile.getPreferenceFloat('active_machine'))
+		if addNew:
+			profile.setActiveMachine(profile.getMachineCount())
 
 		self.Bind(wx.wizard.EVT_WIZARD_PAGE_CHANGED, self.OnPageChanged)
 		self.Bind(wx.wizard.EVT_WIZARD_PAGE_CHANGING, self.OnPageChanging)
+		self.Bind(wx.wizard.EVT_WIZARD_CANCEL, self.OnCancel)
 
 		self.firstInfoPage = FirstInfoPage(self, addNew)
 		self.machineSelectPage = MachineSelectPage(self)
@@ -1032,6 +1089,9 @@ class configWizard(wx.wizard.Wizard):
 			self.FindWindowById(wx.ID_BACKWARD).Enable()
 		else:
 			self.FindWindowById(wx.ID_BACKWARD).Disable()
+
+	def OnCancel(self, e):
+		profile.setActiveMachine(self._old_machine_index)
 
 class bedLevelWizardMain(InfoPage):
 	def __init__(self, parent):
