@@ -108,8 +108,8 @@ class SceneView(openglGui.glGuiPanel):
 
 		self.viewSelection = openglGui.glComboButton(self, _("View mode"), [7,19,11,15,23,23], [_("Normal"), _("Overhang"), _("Transparent"), _("X-Ray"), _("Layers"), _("Colors")], (-1,0), self.OnViewChange)
 
-		self.layerColors = openglGui.glColorRangeSelect(self, (-1.5, -3), 0, 1950, (1,1,1), lambda: self.updateColor())
-		self.layerColorer = openglGui.glColorPicker(self, (-2, -5.4), (1,1,1), lambda: self.layerColors.setColor(self.layerColorer.getColor()))
+		self.layerColors = openglGui.glColorRangeSelect(self, (-1, -1), 0, 1950, (1,1,1), lambda: self.updateColor())
+		self.layerColorer = openglGui.glColorPicker(self, (-1.5, -3), (1,1,1), lambda: self.layerColors.setColor(self.layerColorer.getColor()))
 
 		self.youMagineButton = openglGui.glButton(self, 26, _("Share on YouMagine"), (3,0), lambda button: youmagineGui.youmagineManager(self.GetTopLevelParent(), self._scene))
 		self.youMagineButton.setDisabled(True)
@@ -562,6 +562,7 @@ class SceneView(openglGui.glGuiPanel):
 		else:
 			self.viewMode = 'normal'
 		self._engineResultView.setEnabled(self.viewMode == 'gcode')
+		self.updateLayerRange()
 		self.QueueRefresh()
 
 	def OnRotateReset(self, button):
@@ -838,14 +839,17 @@ class SceneView(openglGui.glGuiPanel):
 			self.scaleZmmctrl.setValue(round(size[2], 2))
 
 	def updateLayerRange(self):
-		self._layerHeight = profile.getProfileSettingFloat('layer_height')
 		objects = self._scene.objects()
-		if len(objects) > 0:
+		if self.viewMode == 'layerColors' and len(objects) > 0:
+			self._layerHeight = profile.getProfileSettingFloat('layer_height')
 			tallestObject = max(objects, key=lambda obj : obj.getSize()[2])
 			numLayers = int(math.ceil(tallestObject.getSize()[2] / self._layerHeight))
 			self.layerColors.setRange(0, max(numLayers, 1))
+			self.layerColors.setHidden(False)
+			self.layerColorer.setHidden(False)
 		else:
-			self.layerColors.setRange(0, 1)
+			self.layerColors.setHidden(True)
+			self.layerColorer.setHidden(True)
 
 	def OnKeyChar(self, keyCode):
 		if self._engineResultView.OnKeyChar(keyCode):
@@ -937,6 +941,7 @@ class SceneView(openglGui.glGuiPanel):
 		self._mouseClickFocus = self._focusObj
 		if e.ButtonDClick():
 			self._mouseState = 'doubleClick'
+			self.layerColors.deselectAll()
 		else:
 			if self._mouseState == 'dragObject' and self._selectedObj is not None:
 				self._scene.pushFree(self._selectedObj)
@@ -952,6 +957,8 @@ class SceneView(openglGui.glGuiPanel):
 				if self._focusObj is not None:
 					self._selectObject(self._focusObj, False)
 					self.QueueRefresh()
+				else:
+					self.layerColors.deselectAll()
 
 	def OnMouseUp(self, e):
 		if e.LeftIsDown() or e.MiddleIsDown() or e.RightIsDown():
