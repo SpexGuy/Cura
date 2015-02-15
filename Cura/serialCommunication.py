@@ -51,7 +51,11 @@ class serialComm(object):
 
 	def monitorStdin(self):
 		while not self._comm.isClosed():
-			line = sys.stdin.readline().strip()
+			line = sys.stdin.readline()
+			if not line:
+				sys.stderr.write("\nClient closed connection to printer\n")
+				return
+			line = line.strip()
 			line = line.split(':', 1)
 			if line[0] == 'STOP':
 				self._comm.cancelPrint()

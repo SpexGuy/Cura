@@ -256,21 +256,35 @@ class SceneView(openglGui.glGuiPanel):
 
 	def OnPrintFilamentButton(self, button):
 		if button == 1:
-			connectionGroup = self._colorConnectionManager.getAvailableGroup()
-			if connectionGroup is not None:
-				connections = connectionGroup.getAvailableConnections()
-				if len(connections) < 2:
-					connection = connections[0]
+			colorConnectionGroup = self._colorConnectionManager.getAvailableGroup()
+			if colorConnectionGroup is None:
+				self.showSaveColorGCode()
+			else:
+				colorConnections = colorConnectionGroup.getAvailableConnections()
+				if len(colorConnections) < 2:
+					colorConnection = colorConnections[0]
 				else:
-					dlg = wx.SingleChoiceDialog(self, "Select the %s connection to use" % (connectionGroup.getName()), "Multiple %s connections found" % (connectionGroup.getName()), map(lambda n: n.getName(), connections))
+					dlg = wx.SingleChoiceDialog(self, "Select the %s connection to use" % (colorConnectionGroup.getName()), "Multiple %s connections found" % (colorConnectionGroup.getName()), map(lambda n: n.getName(), colorConnections))
 					if dlg.ShowModal() != wx.ID_OK:
 						dlg.Destroy()
 						return
-					connection = connections[dlg.GetSelection()]
+					colorConnection = colorConnections[dlg.GetSelection()]
 					dlg.Destroy()
-				self._openPrintWindowForConnection(connection, self._getColorGCode(lambda a, b: None)) #TODO: Hangs UI Thread
-			else:
-				self.showSaveColorGCode()
+
+				connectionGroup = self._printerConnectionManager.getAvailableGroup()
+				if connectionGroup is not None:
+					connections = connectionGroup.getAvailableConnections()
+					if len(connections) < 2:
+						connection = connections[0]
+					else:
+						dlg = wx.SingleChoiceDialog(self, "Select the %s connection to use" % (connectionGroup.getName()), "Multiple %s connections found" % (connectionGroup.getName()), map(lambda n: n.getName(), connections))
+						if dlg.ShowModal() != wx.ID_OK:
+							dlg.Destroy()
+							return
+						connection = connections[dlg.GetSelection()]
+						dlg.Destroy()
+					self._openColorPrintWindowForConnection(connection, self._engine.getResult().getGCode(), colorConnection, self._getColorGCode(lambda a, b: None)) #TODO: Hangs UI Thread
+
 		if button == 3:
 			menu = wx.Menu()
 			connections = self._colorConnectionManager.getAvailableConnections()
@@ -338,6 +352,31 @@ class SceneView(openglGui.glGuiPanel):
 			self.Bind(wx.EVT_MENU, lambda e: self._showEngineLog(), menu.Append(-1, _("Slice engine log...")))
 			self.PopupMenu(menu)
 			menu.Destroy()
+
+	def _openColorPrintWindowForConnection(self, connection, gcode, spectromConnection, colorCode):
+		if (connection.window is None or not connection.window) and (spectromConnection.window is None or not spectromConnection.window):
+			connection.window = None
+			spectromConnection.window = None
+#			windowType = profile.getPreference('printing_window')
+#			for p in pluginInfo.getPluginList('printwindow'):
+#				if p.getName() == windowType:
+#					connection.window = printWindow.printWindowPlugin(self, connection, p.getFullFilename())
+#					break
+#			if connection.window is None:
+			connection.window = printWindow.printWindowBasic(self, connection, spectromConnection)
+			spectromConnection.window = connection.window
+		connection.window.Show()
+		connection.window.Raise()
+		if not spectromConnection.loadGCodeData(colorCode):
+			if spectromConnection.isPrinting():
+				self.notification.message("Cannot start print, because Spectrom device still running.")
+			else:
+				self.notification.message("Failed to send CCode...")
+		if not connection.loadGCodeData(gcode):
+			if connection.isPrinting():
+				self.notification.message("Cannot start print, because other print still running.")
+			else:
+				self.notification.message("Failed to start print...")
 
 	def _openPrintWindowForConnection(self, connection, gcode):
 		if connection.window is None or not connection.window:
@@ -447,59 +486,56 @@ class SceneView(openglGui.glGuiPanel):
 	def _getColorGCode(self, progressCallback):
 		result = self._engine.getResult()
 		layers = result.waitForGCodeLayers(progressCallback)
+		totals = list(LayerExtents(layers))
 		colorCode = bigDataStorage.BigDataStorage()
-#		colorCode.write(';LAYERS:\n')
-#		for n in xrange(len(layers)):
-#			extrusions = map(lambda stroke: sum(stroke['extrusion']), layers[n])
-#			elen = sum(extrusions)
-#			colorCode.write(';  %d: ' % (n))
-#			colorCode.write(str(extrusions))
-#			colorCode.write(' (%f)\n' % (elen))
+		colorCode.write(';LAYERS:\n')
+		for n, (layer, total) in enumerate(zip(layers, ['*'] + totals)):
+			colorCode.write(';  %d: ' % (n))
+			colorCode.write(str(filter(lambda stroke: stroke != 0, map(lambda stroke: sum(stroke['extrusion']), layer))))
+			colorCode.write(' (%s)\n' % total)
 		colorCode.write(';COLORS:\n')
 		for n in xrange(len(self._colorLayers)):
 			colorCode.write(';  %d: %02x%02x%02x\n' % (self._colorLayers[n], self._colorColors[n][0] * 255, self._colorColors[n][1] * 255, self._colorColors[n][2] * 255))
 
-		colorCode.write('G100\n') # start the print with a flush
-		numLayers = len(layers)
-		lastLayer = 1
+		colorCode.write('M92 E463.00\n')
+
+		numLayers = len(totals)
+
+		lastLayer = 0
 		print self._colorLayers
 		for n in xrange(len(self._colorLayers)):
 			# Calculate GCode params for color
 			color = self._colorColors[n]
-			maxColor = max(color)
-			c = (maxColor-color[0])/maxColor if maxColor != 0 else 0
-			m = (maxColor-color[1])/maxColor if maxColor != 0 else 0
-			y = (maxColor-color[2])/maxColor if maxColor != 0 else 0
-			k = 1-maxColor
-			# Round values for boolean markers
+			r = color[0]
+			g = color[1]
+			b = color[2]
+			#maxColor = max(color)
+			#c = (maxColor-color[0])/maxColor if maxColor != 0 else 0
+			#m = (maxColor-color[1])/maxColor if maxColor != 0 else 0
+			#y = (maxColor-color[2])/maxColor if maxColor != 0 else 0
+			#k = 1-maxColor
+			## Round values for boolean markers
 			#c = 255 if c > 0.5 else 0
 			#m = 255 if m > 0.5 else 0
 			#y = 255 if y > 0.5 else 0
 			#k = 255 if k > 0.5 else 0
 			# Find the start and end layer
-			layer = self._colorLayers[n]+1
+			layer = self._colorLayers[n]
 			# Truncate to max layer
 			truncated = layer > numLayers
 			if truncated:
 				layer = numLayers
 			# Total the filament length
-			e = sum(map(
-				lambda lyr:
-					sum(map(lambda stroke:
-						sum(stroke['extrusion']),
-					lyr)),
-				layers[lastLayer:layer]))
+			e = sum(totals[lastLayer:layer])
 			#e *= 48.23 # convert to ESteps
 			# Add the instruction
-			print e
-			colorCode.write("G1 C%01.4d M%01.4d Y%01.4d K%01.4d E%.2f ;Layers %d to %d\n" % (c, m, y, k, e, lastLayer, layer))
+			colorCode.write("C1 R%01.5f G%01.5f B%01.5f E%.3f ;Layers %d to %d\n" % (r, g, b, e, lastLayer, layer))
 			lastLayer = layer
 			# Done if truncated
 			if truncated:
 				colorCode.write('; Truncated!\n')
 				break
 
-		colorCode.write('G100\n') # end the print with a flush
 		colorCode.seekStart()
 		return colorCode
 
@@ -1719,6 +1755,21 @@ class SceneView(openglGui.glGuiPanel):
 		if self._selectedObj is None:
 			return numpy.matrix(numpy.identity(3))
 		return self._selectedObj.getMatrix()
+
+#TODO: Put this in a seperate file
+def LayerExtents(layers):
+	total = 0
+	maxSeen = 0
+	lastTotal = 0
+	for layer in layers[1:]:
+		for stroke in layer:
+			for extent in stroke['extrusion']:
+				total += extent
+				if total > maxSeen:
+					maxSeen = total
+		yield maxSeen - lastTotal
+		lastTotal = maxSeen
+
 
 #TODO: Remove this or put it in a seperate file
 class shaderEditor(wx.Frame):

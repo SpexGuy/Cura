@@ -308,9 +308,10 @@ class printWindowBasic(wx.Frame):
 	Printing window for USB printing, network printing, and any other type of printer connection we can think off.
 	This is only a basic window with minimal information.
 	"""
-	def __init__(self, parent, printerConnection):
+	def __init__(self, parent, printerConnection, spectromConnection = None):
 		super(printWindowBasic, self).__init__(parent, -1, style=wx.CLOSE_BOX|wx.CLIP_CHILDREN|wx.CAPTION|wx.SYSTEM_MENU|wx.FRAME_TOOL_WINDOW|wx.FRAME_FLOAT_ON_PARENT, title=_("Printing on %s") % (printerConnection.getName()))
 		self._printerConnection = printerConnection
+		self._spectromConnection = spectromConnection
 		self._lastUpdateTime = 0
 
 		self.SetSizer(wx.BoxSizer())
@@ -331,9 +332,12 @@ class printWindowBasic(wx.Frame):
 		self.OnPowerWarningChange(None)
 		self.powerWarningTimer.Start(10000)
 
-		self.statsText = wx.StaticText(self.panel, -1, _("InfoLine from printer connection\nInfoLine from dialog\nExtra line\nMore lines for layout\nMore lines for layout\nMore lines for layout"))
+		self.statsText = wx.StaticText(self.panel, -1, _("InfoLine from printer connection\nInfoLine from dialog\nExtra line\nMore lines for layout\nMore lines for layout"))
+		self.colorStatsText = wx.StaticText(self.panel, -1, _("InfoLine from Spectrom connection"))
 
-		self.connectButton = wx.Button(self.panel, -1, _("Connect"))
+		self.connectButton = wx.Button(self.panel, -1, _("Connect Printer"))
+		if spectromConnection is not None:
+			self.connectSpectromButton = wx.Button(self.panel, -1, _("Connect Spectrom"))
 		#self.loadButton = wx.Button(self.panel, -1, 'Load')
 		self.printButton = wx.Button(self.panel, -1, _("Print"))
 		self.pauseButton = wx.Button(self.panel, -1, _("Pause"))
@@ -341,18 +345,23 @@ class printWindowBasic(wx.Frame):
 		self.errorLogButton = wx.Button(self.panel, -1, _("Error log"))
 		self.progress = wx.Gauge(self.panel, -1, range=1000)
 
-		self.sizer.Add(self.powerWarningText, pos=(0, 0), span=(1, 5), flag=wx.EXPAND|wx.BOTTOM, border=5)
-		self.sizer.Add(self.statsText, pos=(1, 0), span=(1, 5), flag=wx.LEFT, border=5)
-		self.sizer.Add(self.connectButton, pos=(2, 0))
-		#self.sizer.Add(self.loadButton, pos=(2,1))
-		self.sizer.Add(self.printButton, pos=(2, 1))
-		self.sizer.Add(self.pauseButton, pos=(2, 2))
-		self.sizer.Add(self.cancelButton, pos=(2, 3))
-		self.sizer.Add(self.errorLogButton, pos=(2, 4))
-		self.sizer.Add(self.progress, pos=(3, 0), span=(1, 5), flag=wx.EXPAND)
+		self.sizer.Add(self.powerWarningText, pos=(0, 0), span=(1, 6), flag=wx.EXPAND|wx.BOTTOM, border=5)
+		self.sizer.Add(self.statsText, pos=(1, 0), span=(1, 6), flag=wx.LEFT, border=5)
+		self.sizer.Add(self.colorStatsText, pos=(2, 0), span=(1, 6), flag=wx.LEFT, border=5)
+		self.sizer.Add(self.connectButton, pos=(3, 0))
+		if spectromConnection is not None:
+			self.sizer.Add(self.connectSpectromButton, pos=(3, 1))
+		#self.sizer.Add(self.loadButton, pos=(3,1))
+		self.sizer.Add(self.printButton, pos=(3, 2))
+		self.sizer.Add(self.pauseButton, pos=(3, 3))
+		self.sizer.Add(self.cancelButton, pos=(3, 4))
+		self.sizer.Add(self.errorLogButton, pos=(3, 5))
+		self.sizer.Add(self.progress, pos=(4, 0), span=(1, 6), flag=wx.EXPAND)
 
 		self.Bind(wx.EVT_CLOSE, self.OnClose)
 		self.connectButton.Bind(wx.EVT_BUTTON, self.OnConnect)
+		if spectromConnection is not None:
+			self.connectSpectromButton.Bind(wx.EVT_BUTTON, self.OnConnectSpectrom)
 		#self.loadButton.Bind(wx.EVT_BUTTON, self.OnLoad)
 		self.printButton.Bind(wx.EVT_BUTTON, self.OnPrint)
 		self.pauseButton.Bind(wx.EVT_BUTTON, self.OnPause)
@@ -364,13 +373,18 @@ class printWindowBasic(wx.Frame):
 		self.Centre()
 
 		self.progress.SetMinSize(self.progress.GetSize())
-		self.statsText.SetLabel('\n\n\n\n\n\n')
+		self.statsText.SetLabel('\n\n\n\n\n')
+		self.colorStatsText.SetLabel('')
 		self._updateButtonStates()
 
 		self._printerConnection.addCallback(self._doPrinterConnectionUpdate)
+		if spectromConnection is not None:
+			spectromConnection.addCallback(self._doSpectromConnectionUpdate)
 
 		if self._printerConnection.hasActiveConnection() and not self._printerConnection.isActiveConnectionOpen():
 			self._printerConnection.openActiveConnection()
+		if spectromConnection is not None and spectromConnection.hasActiveConnection() and not spectromConnection.isActiveConnectionOpen():
+			spectromConnection.openActiveConnection()
 		preventComputerFromSleeping(True)
 
 	def OnPowerWarningChange(self, e):
@@ -393,6 +407,8 @@ class printWindowBasic(wx.Frame):
 			if self._printerConnection.isPrinting():
 				pass #TODO: Give warning that the close will kill the print.
 			self._printerConnection.closeActiveConnection()
+		if self._spectromConnection is not None and self._spectromConnection.hasActiveConnection():
+			self._spectromConnection.closeActiveConnection()
 		self._printerConnection.removeCallback(self._doPrinterConnectionUpdate)
 		#TODO: When multiple printer windows are open, closing one will enable sleeping again.
 		preventComputerFromSleeping(False)
@@ -401,13 +417,20 @@ class printWindowBasic(wx.Frame):
 	def OnConnect(self, e):
 		self._printerConnection.openActiveConnection()
 
+	def OnConnectSpectrom(self, e):
+		self._spectromConnection.openActiveConnection()
+
 	def OnLoad(self, e):
 		pass
 
 	def OnPrint(self, e):
+		if self._spectromConnection is not None:
+			self._spectromConnection.startPrint()
 		self._printerConnection.startPrint()
 
 	def OnCancel(self, e):
+		if self._spectromConnection is not None:
+			self._spectromConnection.cancelPrint()
 		self._printerConnection.cancelPrint()
 
 	def OnPause(self, e):
@@ -424,7 +447,7 @@ class printWindowBasic(wx.Frame):
 	def __doPrinterConnectionUpdate(self, connection, extraInfo):
 		t = time.time()
 		if self._lastUpdateTime + 0.5 > t and extraInfo is None:
-			print "Update too soon!"
+			print "Printer update too soon!"
 			#return # TODO: This is buggy sometimes
 		self._lastUpdateTime = t
 
@@ -445,14 +468,37 @@ class printWindowBasic(wx.Frame):
 		info += '\n\n'
 		self.statsText.SetLabel(info)
 
+	def _doSpectromConnectionUpdate(self, connection, extraInfo = None):
+		wx.CallAfter(self.__doSpectromConnectionUpdate, connection, extraInfo)
+
+	def __doSpectromConnectionUpdate(self, connection, extraInfo):
+		t = time.time()
+		if self._lastUpdateTime + 0.5 > t and extraInfo is None:
+			print "Spectrom update too soon!"
+			#return # TODO: This is buggy sometimes
+		self._lastUpdateTime = t
+
+		if extraInfo is not None:
+			self._addTermLog('< %s\n' % (extraInfo))
+
+		self._updateButtonStates()
+		info = connection.getStatusString()
+		self.colorStatsText.SetLabel(info)
+
 	def _addTermLog(self, msg):
 		pass
 
 	def _updateButtonStates(self):
 		self.connectButton.Show(self._printerConnection.hasActiveConnection())
 		self.connectButton.Enable(not self._printerConnection.isActiveConnectionOpen() and not self._printerConnection.isActiveConnectionOpening())
+		if self._spectromConnection is not None:
+			self.connectSpectromButton.Enable(not self._spectromConnection.isActiveConnectionOpen() and not self._spectromConnection.isActiveConnectionOpening())
 		self.pauseButton.Show(self._printerConnection.hasPause())
-		if not self._printerConnection.hasActiveConnection() or self._printerConnection.isActiveConnectionOpen():
+
+		opened = not self._printerConnection.hasActiveConnection() or self._printerConnection.isActiveConnectionOpen()
+		if self._spectromConnection:
+			opened = opened and self._spectromConnection.isActiveConnectionOpen()
+		if opened:
 			self.printButton.Enable(not self._printerConnection.isPrinting())
 			self.pauseButton.Enable(self._printerConnection.isPrinting())
 			self.cancelButton.Enable(self._printerConnection.isPrinting())
