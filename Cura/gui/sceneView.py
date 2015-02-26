@@ -458,8 +458,9 @@ class SceneView(openglGui.glGuiPanel):
 		for n in xrange(len(self._colorLayers)):
 			colorCode.write(';  %d: %02x%02x%02x\n' % (self._colorLayers[n], self._colorColors[n][0] * 255, self._colorColors[n][1] * 255, self._colorColors[n][2] * 255))
 
-		colorCode.write('M92 E477.00\n')
-		colorCode.write('M93 B825.00\n')
+		colorCode.write('M92 E%.5f\n' % (profile.getMachineSettingFloat('color_steps_per_e'),))
+		#colorCode.write('M92 P%.5f\n' % (profile.getMachineSettingFloat('steps_per_e'),))
+		colorCode.write('M93 B%.5f\n' % (profile.getMachineSettingFloat('color_bodin_length'),))
 
 		numLayers = len(totals)
 
@@ -471,16 +472,7 @@ class SceneView(openglGui.glGuiPanel):
 			r = color[0]
 			g = color[1]
 			b = color[2]
-			#maxColor = max(color)
-			#c = (maxColor-color[0])/maxColor if maxColor != 0 else 0
-			#m = (maxColor-color[1])/maxColor if maxColor != 0 else 0
-			#y = (maxColor-color[2])/maxColor if maxColor != 0 else 0
-			#k = 1-maxColor
-			## Round values for boolean markers
-			#c = 255 if c > 0.5 else 0
-			#m = 255 if m > 0.5 else 0
-			#y = 255 if y > 0.5 else 0
-			#k = 255 if k > 0.5 else 0
+
 			# Find the start and end layer
 			layer = self._colorLayers[n]
 			# Truncate to max layer
@@ -489,7 +481,6 @@ class SceneView(openglGui.glGuiPanel):
 				layer = numLayers
 			# Total the filament length
 			e = sum(totals[lastLayer:layer])
-			#e *= 48.23 # convert to ESteps
 			# Add the instruction
 			colorCode.write("C1 R%01.5f G%01.5f B%01.5f E%.3f ;Layers %d to %d\n" % (r, g, b, e, lastLayer, layer))
 			lastLayer = layer

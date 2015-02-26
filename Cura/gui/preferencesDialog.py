@@ -84,6 +84,8 @@ class machineSettingsDialog(wx.Dialog):
 			left, right, main = self.panel.CreateConfigPanel(self.nb)
 			configBase.TitleRow(left, _("Machine settings"))
 			configBase.SettingRow(left, 'steps_per_e', index=idx)
+			configBase.SettingRow(left, 'color_steps_per_e', index=idx)
+			configBase.SettingRow(left, 'color_bodin_length', index=idx)
 			configBase.SettingRow(left, 'machine_width', index=idx)
 			configBase.SettingRow(left, 'machine_depth', index=idx)
 			configBase.SettingRow(left, 'machine_height', index=idx)
