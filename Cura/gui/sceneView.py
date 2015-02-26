@@ -458,7 +458,8 @@ class SceneView(openglGui.glGuiPanel):
 		for n in xrange(len(self._colorLayers)):
 			colorCode.write(';  %d: %02x%02x%02x\n' % (self._colorLayers[n], self._colorColors[n][0] * 255, self._colorColors[n][1] * 255, self._colorColors[n][2] * 255))
 
-		colorCode.write('M92 E463.00\n')
+		colorCode.write('M92 E477.00\n')
+		colorCode.write('M93 B825.00\n')
 
 		numLayers = len(totals)
 
