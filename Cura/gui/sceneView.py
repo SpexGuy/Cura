@@ -268,8 +268,17 @@ class SceneView(openglGui.glGuiPanel):
 						return
 					connection = connections[dlg.GetSelection()]
 					dlg.Destroy()
-				self._openPrintWindowForConnection(connection, self._getColorGCode(lambda a, b: None)) #TODO: Hangs UI Thread
-			else:
+				gcode = self._getColorGCode(lambda a, b: None) #TODO: Hangs UI Thread
+				if connection.window is None or not connection.window:
+					connection.window = printWindow.printWindowBasic(self, connection)
+					connection.window.Show()
+					connection.window.Raise()
+				if not connection.loadGCodeData(gcode):
+					if connection.isPrinting():
+						self.notification.message("Cannot start print, because other print still running.")
+					else:
+						self.notification.message("Failed to start print...")
+		else:
 				self.showSaveColorGCode()
 		if button == 3:
 			menu = wx.Menu()
