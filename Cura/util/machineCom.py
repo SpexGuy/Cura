@@ -743,10 +743,11 @@ class ColorCom(MachineCom):
 		if port is None:
 			port = profile.getMachineSetting('color_serial_port')
 		if baudrate is None:
-			if profile.getMachineSetting('color_serial_baud') == 'AUTO':
+			profileBaud = profile.getMachineSetting('color_serial_baud')
+			if profileBaud == 'AUTO':
 				baudrate = 0
 			else:
-				baudrate = int(profile.getMachineSetting('serial_baud'))
+				baudrate = int(profileBaud)
 		super(ColorCom, self).__init__(port, baudrate, callbackObject)
 
 	def _preprocessCommand(self, cmd):
