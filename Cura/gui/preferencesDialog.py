@@ -27,6 +27,7 @@ class preferencesDialog(wx.Dialog):
 			printWindowTypes.append(p.getName())
 		configBase.TitleRow(left, _("Print window"))
 		configBase.SettingRow(left, 'printing_window', printWindowTypes)
+		configBase.SettingRow(left, 'coloring_window', printWindowTypes)
 
 		configBase.TitleRow(left, _("Colours"))
 		configBase.SettingRow(left, 'model_colour', wx.Colour)

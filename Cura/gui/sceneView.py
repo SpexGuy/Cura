@@ -269,15 +269,7 @@ class SceneView(openglGui.glGuiPanel):
 					connection = connections[dlg.GetSelection()]
 					dlg.Destroy()
 				gcode = self._getColorGCode(lambda a, b: None) #TODO: Hangs UI Thread
-				if connection.window is None or not connection.window:
-					connection.window = printWindow.printWindowBasic(self, connection)
-					connection.window.Show()
-					connection.window.Raise()
-				if not connection.loadGCodeData(gcode):
-					if connection.isPrinting():
-						self.notification.message("Cannot start print, because other print still running.")
-					else:
-						self.notification.message("Failed to start print...")
+				self._openPrintWindowForConnection(connection, profile.getPreference('coloring_window'), gcode)
 		else:
 				self.showSaveColorGCode()
 		if button == 3:
@@ -287,7 +279,7 @@ class SceneView(openglGui.glGuiPanel):
 			for connection in connections:
 				i = menu.Append(-1, _("Print with %s") % (connection.getName()))
 				menu.connectionMap[i.GetId()] = connection
-				self.Bind(wx.EVT_MENU, lambda e: self._openPrintWindowForConnection(e.GetEventObject().connectionMap[e.GetId()], self._getColorGCode(lambda r, p: None)), i)
+				self.Bind(wx.EVT_MENU, lambda e: self._openPrintWindowForConnection(e.GetEventObject().connectionMap[e.GetId()], profile.getPreference('coloring_window'), self._getColorGCode(lambda r, p: None)), i)
 			self.Bind(wx.EVT_MENU, lambda e: self.showSaveColorGCode(), menu.Append(-1, _("Save GCode...")))
 			self.PopupMenu(menu)
 			menu.Destroy()
@@ -332,7 +324,7 @@ class SceneView(openglGui.glGuiPanel):
 						return
 					connection = connections[dlg.GetSelection()]
 					dlg.Destroy()
-				self._openPrintWindowForConnection(connection, self._engine.getResult().getGCode())
+				self._openPrintWindowForConnection(connection, profile.getPreference('printing_window'), self._engine.getResult().getGCode())
 			else:
 				self.showSaveGCode()
 		if button == 3:
@@ -342,16 +334,15 @@ class SceneView(openglGui.glGuiPanel):
 			for connection in connections:
 				i = menu.Append(-1, _("Print with %s") % (connection.getName()))
 				menu.connectionMap[i.GetId()] = connection
-				self.Bind(wx.EVT_MENU, lambda e: self._openPrintWindowForConnection(e.GetEventObject().connectionMap[e.GetId()]), i)
+				self.Bind(wx.EVT_MENU, lambda e: self._openPrintWindowForConnection(e.GetEventObject().connectionMap[e.GetId()], profile.getPreference('printing_window'), self._engine.getResult().getGCode()), i)
 			self.Bind(wx.EVT_MENU, lambda e: self.showSaveGCode(), menu.Append(-1, _("Save GCode...")))
 			self.Bind(wx.EVT_MENU, lambda e: self._showEngineLog(), menu.Append(-1, _("Slice engine log...")))
 			self.PopupMenu(menu)
 			menu.Destroy()
 
-	def _openPrintWindowForConnection(self, connection, gcode):
+	def _openPrintWindowForConnection(self, connection, windowType, gcode):
 		if connection.window is None or not connection.window:
 			connection.window = None
-			windowType = profile.getPreference('printing_window')
 			for p in pluginInfo.getPluginList('printwindow'):
 				if p.getName() == windowType:
 					connection.window = printWindow.printWindowPlugin(self, connection, p.getFullFilename())
