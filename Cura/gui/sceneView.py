@@ -468,7 +468,7 @@ class SceneView(openglGui.glGuiPanel):
 			colorCode.write(';  %d: %02x%02x%02x\n' % (self._colorLayers[n], self._colorColors[n][0] * 255, self._colorColors[n][1] * 255, self._colorColors[n][2] * 255))
 
 		colorCode.write('M92 E%.5f\n' % (profile.getMachineSettingFloat('color_steps_per_e'),))
-		#colorCode.write('M92 P%.5f\n' % (profile.getMachineSettingFloat('steps_per_e'),))
+		colorCode.write('M92 P%.5f\n' % (profile.getMachineSettingFloat('steps_per_e'),))
 		colorCode.write('M93 B%.5f\n' % (profile.getMachineSettingFloat('color_bodin_length'),))
 
 		numLayers = len(totals)
