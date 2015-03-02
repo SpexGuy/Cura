@@ -200,13 +200,18 @@ class serialConnection(printerConnectionBase.printerConnectionBase):
 	def getErrorLog(self):
 		return '\n'.join(self._log)
 
-	def _serialCommunicationThread(self):
+def _serialCommunicationThread(self):
+		if self._machineType == 'color':
+			baudrate = profile.getMachineSetting('color_serial_baud')
+		else:
+			baudrate = profile.getMachineSetting('serial_baud')
+
 		if platform.system() == "Darwin" and hasattr(sys, 'frozen'):
 			cmdList = [os.path.join(os.path.dirname(sys.executable), 'Cura'), '--serialCommunication']
-			cmdList += [self._portName + ':' + profile.getMachineSetting('serial_baud') + ':' + self._machineType] #TODO: don't hardcode printer
+			cmdList += [self._portName + ':' + baudrate + ':' + self._machineType] #TODO: don't hardcode printer
 		else:
 			cmdList = [sys.executable, '-m', 'Cura.serialCommunication']
-			cmdList += [self._portName, profile.getMachineSetting('serial_baud'), self._machineType]
+			cmdList += [self._portName, baudrate, self._machineType]
 		if platform.system() == "Darwin":
 			if platform.machine() == 'i386':
 				cmdList = ['arch', '-i386'] + cmdList
