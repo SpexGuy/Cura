@@ -154,7 +154,7 @@ class setting(object):
 				result = res
 			elif res == validators.WARNING and result != validators.ERROR:
 				result = res
-			if res != validators.SUCCESS:
+			if len(err) > 0:
 				msgs.append(err)
 		return result, '\n'.join(msgs)
 
@@ -487,7 +487,21 @@ setting('save_profile', 'False', bool, 'preference', 'hidden').setLabel(_("Save 
 setting('filament_cost_kg', '0', float, 'preference', 'hidden').setLabel(_("Cost (price/kg)"), _("Cost of your filament per kg, to estimate the cost of the final print."))
 setting('filament_cost_meter', '0', float, 'preference', 'hidden').setLabel(_("Cost (price/m)"), _("Cost of your filament per meter, to estimate the cost of the final print."))
 setting('auto_detect_sd', 'True', bool, 'preference', 'hidden').setLabel(_("Auto detect SD card drive"), _("Auto detect the SD card. You can disable this because on some systems external hard-drives or USB sticks are detected as SD card."))
-setting('sdcard_rootfolder', '', str, 'preference', 'hidden').setLabel(_("Base folder to replicate on SD card"), _("The specified folder will be used as a base path. Any gcode generated from object coming from within that folder will be automatically saved on the SD card at the same sub-folder. Any object coming from outside of this path will save the gcode on the root folder of the card."))
+
+def _getMyDocumentsFolder():
+	if platform.system() == "Windows":
+		path = os.path.expanduser('~/Documents')
+	else:
+		path = os.path.expanduser('~/')
+	if not os.path.exists(path):
+		path = ''
+	try:
+		path = unicode(path)
+	except UnicodeDecodeError:
+		path = ''
+	return path
+
+setting('sdcard_rootfolder', _getMyDocumentsFolder(), str, 'preference', 'hidden').setLabel(_("Base folder to replicate on SD card"), _("The specified folder will be used as a base path. Any gcode generated from object coming from within that folder will be automatically saved on the SD card at the same sub-folder. Any object coming from outside of this path will save the gcode on the root folder of the card."))
 setting('check_for_updates', 'True', bool, 'preference', 'hidden').setLabel(_("Check for updates"), _("Check for newer versions of Cura on startup"))
 setting('submit_slice_information', 'False', bool, 'preference', 'hidden').setLabel(_("Send usage statistics"), _("Submit anonymous usage information to improve future versions of Cura"))
 setting('youmagine_token', '', str, 'preference', 'hidden')
@@ -552,6 +566,11 @@ validators.warningAbove(settingsDictionary['layer_height'], lambda : (float(getP
 validators.wallThicknessValidator(settingsDictionary['wall_thickness'])
 validators.warningAbove(settingsDictionary['print_speed'], 150.0, _("It is highly unlikely that your machine can achieve a printing speed above 150mm/s"))
 validators.printSpeedValidator(settingsDictionary['print_speed'])
+validators.printSpeedValidator(settingsDictionary['bottom_layer_speed'])
+validators.printSpeedValidator(settingsDictionary['infill_speed'])
+validators.printSpeedValidator(settingsDictionary['solidarea_speed'])
+validators.printSpeedValidator(settingsDictionary['inset0_speed'])
+validators.printSpeedValidator(settingsDictionary['insetx_speed'])
 validators.warningAbove(settingsDictionary['print_temperature'], 260.0, _("Temperatures above 260C could damage your machine, be careful!"))
 validators.warningAbove(settingsDictionary['print_temperature2'], 260.0, _("Temperatures above 260C could damage your machine, be careful!"))
 validators.warningAbove(settingsDictionary['print_temperature3'], 260.0, _("Temperatures above 260C could damage your machine, be careful!"))
