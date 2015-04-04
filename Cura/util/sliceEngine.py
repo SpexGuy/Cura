@@ -275,9 +275,18 @@ class Engine(object):
 						data += recvData
 					polygon2d = numpy.array(numpy.fromstring(data, numpy.int64), numpy.float32) / 1000.0
 					polygon2d = polygon2d.reshape((len(polygon2d) / 2, 2))
+					data = ''
+					while len(data) < length * 4 * 3:
+						recvData = sock.recv(length * 4 * 3 - len(data))
+						if len(recvData) < 1:
+							return
+						data += recvData
+					polygonColors = numpy.array(numpy.fromstring(data, numpy.float32), numpy.float32)
+					polygonColors = polygonColors.reshape((len(polygonColors) / 3, 3))
 					polygon = numpy.empty((len(polygon2d), 3), numpy.float32)
-					polygon[:,:-1] = polygon2d
+					polygon[:,:2] = polygon2d
 					polygon[:,2] = z
+					#polygon[:,3:] = polygonColors
 					polygons[typeName].append(polygon)
 			elif cmd == self.GUI_CMD_FINISH_OBJECT:
 				layerNrOffset = len(self._result._polygons)
