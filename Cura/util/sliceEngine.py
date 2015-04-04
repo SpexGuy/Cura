@@ -251,7 +251,14 @@ class Engine(object):
 				meshInfo = self._modelData[0]
 				self._modelData = self._modelData[1:]
 				sock.sendall(struct.pack('@i', meshInfo[0]))
-				sock.sendall(meshInfo[1].tostring())
+				for idx in xrange(0, len(meshInfo[1]), 3):
+					sock.sendall(meshInfo[1][idx].tostring())
+					sock.sendall(meshInfo[1][idx+1].tostring())
+					sock.sendall(meshInfo[1][idx+2].tostring())
+					if meshInfo[2] is not None:
+						sock.sendall(meshInfo[2][idx+2].tostring())
+					else:
+						sock.sendall(struct.pack('@fff', -1.0, -1.0, -1.0))
 			elif cmd == self.GUI_CMD_SEND_POLYGONS:
 				cnt = struct.unpack('@i', sock.recv(4))[0]
 				layerNr = struct.unpack('@i', sock.recv(4))[0]
@@ -380,6 +387,7 @@ class Engine(object):
 
 			for n in xrange(0, meshMax):
 				verts = numpy.zeros((0, 3), numpy.float32)
+				colors = numpy.zeros((0, 3), numpy.float32)
 				for obj in scene.objects():
 					if scene.checkPlatform(obj):
 						if n < len(obj._meshList):
@@ -387,8 +395,9 @@ class Engine(object):
 							vertexes -= obj._drawOffset
 							vertexes += numpy.array([obj.getPosition()[0], obj.getPosition()[1], 0.0])
 							verts = numpy.concatenate((verts, vertexes))
+							colors = numpy.concatenate((colors, obj._meshList[n].colors))
 							hash.update(obj._meshList[n].vertexes.tostring())
-				engineModelData.append((vertexTotal[n], verts))
+				engineModelData.append((vertexTotal[n], verts, colors))
 
 			commandList += ['$' * meshMax]
 			self._objCount = 1
@@ -396,7 +405,7 @@ class Engine(object):
 			for n in order:
 				obj = scene.objects()[n]
 				for mesh in obj._meshList:
-					engineModelData.append((mesh.vertexCount, mesh.vertexes))
+					engineModelData.append((mesh.vertexCount, mesh.vertexes, mesh.colors))
 					hash.update(mesh.vertexes.tostring())
 				pos = obj.getPosition() * 1000
 				pos += numpy.array(profile.getMachineCenterCoords()) * 1000
