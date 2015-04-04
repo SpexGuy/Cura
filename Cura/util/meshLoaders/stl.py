@@ -90,4 +90,9 @@ def saveSceneStream(stream, objects):
 				stream.write(struct.pack("<fff", v1[0], v1[1], v1[2]))
 				stream.write(struct.pack("<fff", v2[0], v2[1], v2[2]))
 				stream.write(struct.pack("<fff", v3[0], v3[1], v3[2]))
-				stream.write(struct.pack("<H", 0))
+				if m.colors is not None:
+					c = m.colors[idx+2]
+					colorBinary = 0x8000 | (int(c[0]*31) << 10) | (int(c[1]*31) << 5) | int(c[2]*31)
+					stream.write(struct.pack("<H", colorBinary))
+				else:
+					stream.write(struct.pack("<H", 0))
