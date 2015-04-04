@@ -303,12 +303,13 @@ class mesh(object):
 	A "VBO" can be associated with this object, which is used for rendering this object.
 	"""
 	def __init__(self, obj):
+		self.colors = None
 		self.vertexes = None
 		self.vertexCount = 0
 		self.vbo = None
 		self._obj = obj
 
-	def _addFace(self, x0, y0, z0, x1, y1, z1, x2, y2, z2):
+	def _addFace(self, x0, y0, z0, x1, y1, z1, x2, y2, z2, r=1.0, g=1.0, b=1.0):
 		n = self.vertexCount
 		self.vertexes[n][0] = x0
 		self.vertexes[n][1] = y0
@@ -321,12 +322,27 @@ class mesh(object):
 		self.vertexes[n][0] = x2
 		self.vertexes[n][1] = y2
 		self.vertexes[n][2] = z2
+		if self.colors is not None:
+			n = self.vertexCount
+			self.colors[n][0] = r
+			self.colors[n][1] = g
+			self.colors[n][2] = b
+			n += 1
+			self.colors[n][0] = r
+			self.colors[n][1] = g
+			self.colors[n][2] = b
+			n += 1
+			self.colors[n][0] = r
+			self.colors[n][1] = g
+			self.colors[n][2] = b
 		self.vertexCount += 3
 	
-	def _prepareFaceCount(self, faceNumber):
+	def _prepareFaceCount(self, faceNumber, useColors=False):
 		#Set the amount of faces before loading data in them. This way we can create the numpy arrays before we fill them.
 		self.vertexes = numpy.zeros((faceNumber*3, 3), numpy.float32)
 		self.normal = numpy.zeros((faceNumber*3, 3), numpy.float32)
+		if useColors:
+			self.colors = numpy.zeros((faceNumber*3, 3), numpy.float32)
 		self.vertexCount = 0
 
 	def _calculateNormals(self):

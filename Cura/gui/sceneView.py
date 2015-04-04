@@ -1576,7 +1576,7 @@ class SceneView(openglGui.glGuiPanel):
 		n = 0
 		for m in obj._meshList:
 			if m.vbo is None:
-				m.vbo = openglHelpers.GLVBO(GL_TRIANGLES, m.vertexes, m.normal)
+				m.vbo = openglHelpers.GLVBO(GL_TRIANGLES, m.vertexes, m.normal, colorsArray=m.colors)
 			if brightness != 0:
 				glColor4fv(map(lambda idx: idx * brightness, self._objColors[n]))
 				n += 1

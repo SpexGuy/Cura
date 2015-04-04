@@ -42,10 +42,10 @@ def _loadBinary(m, f):
 	#Skip the header
 	f.read(80-5)
 	faceCount = struct.unpack('<I', f.read(4))[0]
-	m._prepareFaceCount(faceCount)
+	m._prepareFaceCount(faceCount, True)
 	for idx in xrange(0, faceCount):
 		data = struct.unpack("<ffffffffffffH", f.read(50))
-		m._addFace(data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10], data[11])
+		m._addFace(data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10], data[11], idx%2, (idx/2)%2, (idx/4)%2)
 
 def loadScene(filename):
 	obj = printableObject.printableObject(filename)
