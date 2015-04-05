@@ -225,6 +225,9 @@ class GLVBO(GLReferenceCounter):
 			if self._hasNormals:
 				glEnableClientState(GL_NORMAL_ARRAY)
 				glNormalPointer(GL_FLOAT, 0, self._normalArray)
+			if self._hasColors:
+				glEnableClientState(GL_COLOR_ARRAY)
+				glColorPointer(3, GL_FLOAT, 0, self._colorsArray)
 			if self._hasIndices:
 				glDrawElements(self._renderType, self._size, GL_UNSIGNED_INT, self._indicesArray)
 			else:
