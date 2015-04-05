@@ -201,7 +201,7 @@ class GLVBO(GLReferenceCounter):
 						self._idColorOffset += 3 * 4
 					if self._hasIdColors:
 						bufferData.append(idColors[offset:offset+bufferInfo['size']])
-						self._stride += 3 * 1
+						self._stride += 3 * 4
 					glBindBuffer(GL_ARRAY_BUFFER, bufferInfo['buffer'])
 					glBufferData(GL_ARRAY_BUFFER, numpy.concatenate(bufferData, 1), GL_STATIC_DRAW)
 					glBindBuffer(GL_ARRAY_BUFFER, 0)
@@ -211,6 +211,14 @@ class GLVBO(GLReferenceCounter):
 				self._bufferIndices = glGenBuffers(1)
 				glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self._bufferIndices)
 				glBufferData(GL_ELEMENT_ARRAY_BUFFER, numpy.array(indicesArray, numpy.uint32), GL_STATIC_DRAW)
+
+	def _generateIdColors(self, num):
+		# Only works with triangles
+		assert(num < (1<<24))
+		idColors = numpy.zeros((num//3, 3*3), numpy.float32)
+		for n in xrange(num//3):
+			idColors[n,6:] = [float((n >> 16) & 0xFF) / (1<<8), float((n >> 8) & 0xFF) / (1<<8), float((n >> 0) & 0xFF) / (1<<8)]
+		return idColors.reshape((num, 3))
 
 	def render(self, colorMode = 0):
 		glEnableClientState(GL_VERTEX_ARRAY)
@@ -244,7 +252,7 @@ class GLVBO(GLReferenceCounter):
 				if self._hasColors and colorMode == 0:
 					glColorPointer(3, GL_FLOAT, self._stride, c_void_p(self._colorOffset))
 				if self._hasIdColors and colorMode == 1:
-					glColorPointer(3, GL_UNSIGNED_BYTE, self._stride, c_void_p(self._idColorOffset))
+					glColorPointer(3, GL_FLOAT, self._stride, c_void_p(self._idColorOffset))
 				if self._hasIndices:
 					glDrawElements(self._renderType, self._size, GL_UNSIGNED_INT, c_void_p(0))
 				else:
