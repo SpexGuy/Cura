@@ -145,7 +145,7 @@ class GLVBO(GLReferenceCounter):
 	"""
 	Vertex buffer object. Used for faster rendering.
 	"""
-	def __init__(self, renderType, vertexArray, normalArray = None, indicesArray = None, colorsArray = None):
+	def __init__(self, renderType, vertexArray, normalArray = None, indicesArray = None, colorsArray = None, generateIdColors = False):
 		super(GLVBO, self).__init__()
 		# TODO: Add size check to see if normal and vertex arrays have same size.
 		self._renderType = renderType
@@ -159,14 +159,20 @@ class GLVBO(GLReferenceCounter):
 			self._hasNormals = self._normalArray is not None
 			self._hasIndices = self._indicesArray is not None
 			self._hasColors = self._colorsArray is not None
+			self._hasIdColors = generateIdColors
 			if self._hasIndices:
 				self._size = len(indicesArray)
+			if generateIdColors:
+				self._idColors = self._generateIdColors(self._size)
 		else:
 			self._buffers = []
 			self._size = len(vertexArray)
 			self._hasNormals = normalArray is not None
 			self._hasIndices = indicesArray is not None
 			self._hasColors = colorsArray is not None
+			self._hasIdColors = generateIdColors
+			if self._hasIdColors:
+				idColors = self._generateIdColors(self._size)
 			maxVertsPerBuffer = 30000
 			if self._hasIndices:
 				maxVertsPerBuffer = self._size
@@ -180,36 +186,24 @@ class GLVBO(GLReferenceCounter):
 					offset = n * maxVertsPerBuffer
 					if n == bufferCount - 1:
 						bufferInfo['size'] = ((self._size - 1) % maxVertsPerBuffer) + 1
+					bufferData = [vertexArray[offset:offset+bufferInfo['size']]]
+					self._stride = 3 * 4
+					self._colorOffset = 3 * 4
+					self._idColorOffset = 3 * 4
+					if self._hasNormals:
+						bufferData.append(normalArray[offset:offset+bufferInfo['size']])
+						self._stride += 3 * 4
+						self._colorOffset += 3 * 4
+						self._idColorOffset += 3 * 4
+					if self._hasColors:
+						bufferData.append(colorsArray[offset:offset+bufferInfo['size']])
+						self._stride += 3 * 4
+						self._idColorOffset += 3 * 4
+					if self._hasIdColors:
+						bufferData.append(idColors[offset:offset+bufferInfo['size']])
+						self._stride += 3 * 1
 					glBindBuffer(GL_ARRAY_BUFFER, bufferInfo['buffer'])
-					if self._hasColors and self._hasNormals:
-						glBufferData(GL_ARRAY_BUFFER,
-							numpy.concatenate(
-								(vertexArray[offset:offset+bufferInfo['size']],
-								 normalArray[offset:offset+bufferInfo['size']],
-								 colorsArray[offset:offset+bufferInfo['size']]), 1),
-							GL_STATIC_DRAW)
-						self._stride = 9 * 4
-						self._colorOffset = 6 * 4
-					elif self._hasColors:
-						glBufferData(GL_ARRAY_BUFFER,
-							numpy.concatenate(
-								(vertexArray[offset:offset+bufferInfo['size']],
-								 colorsArray[offset:offset+bufferInfo['size']]), 1),
-							GL_STATIC_DRAW)
-						self._stride = 6 * 4
-						self._colorOffset = 3 * 4
-					elif self._hasNormals:
-						glBufferData(GL_ARRAY_BUFFER,
-							numpy.concatenate(
-								(vertexArray[offset:offset+bufferInfo['size']],
-								 normalArray[offset:offset+bufferInfo['size']]), 1),
-							GL_STATIC_DRAW)
-						self._stride = 6 * 4
-					else:
-						glBufferData(GL_ARRAY_BUFFER,
-							vertexArray[offset:offset+bufferInfo['size']],
-							GL_STATIC_DRAW)
-						self._stride = 3 * 4
+					glBufferData(GL_ARRAY_BUFFER, numpy.concatenate(bufferData, 1), GL_STATIC_DRAW)
 					glBindBuffer(GL_ARRAY_BUFFER, 0)
 					self._buffers.append(bufferInfo)
 			if self._hasIndices:
@@ -218,18 +212,18 @@ class GLVBO(GLReferenceCounter):
 				glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self._bufferIndices)
 				glBufferData(GL_ELEMENT_ARRAY_BUFFER, numpy.array(indicesArray, numpy.uint32), GL_STATIC_DRAW)
 
-	def render(self, overrideColor = False):
+	def render(self, colorMode = 0):
 		glEnableClientState(GL_VERTEX_ARRAY)
 		if self._hasNormals:
 			glEnableClientState(GL_NORMAL_ARRAY)
-		if self._hasColors and not overrideColor:
+		if self._hasColors and colorMode == 0 or self._hasIdColors and colorMode == 1:
 			glEnableClientState(GL_COLOR_ARRAY)
 		if self._buffers is None:
 			glVertexPointer(3, GL_FLOAT, 0, self._vertexArray)
 			if self._hasNormals:
 				glNormalPointer(GL_FLOAT, 0, self._normalArray)
-			if self._hasColors and not overrideColor:
-				glColorPointer(3, GL_FLOAT, 0, self._colorsArray)
+			if self._hasColors and colorMode >= 0:
+				glColorPointer(3, GL_FLOAT, 0, self._colorsArrays[colorMode])
 			if self._hasIndices:
 				glDrawElements(self._renderType, self._size, GL_UNSIGNED_INT, self._indicesArray)
 			else:
@@ -247,8 +241,10 @@ class GLVBO(GLReferenceCounter):
 				glVertexPointer(3, GL_FLOAT, self._stride, c_void_p(0))
 				if self._hasNormals:
 					glNormalPointer(GL_FLOAT, self._stride, c_void_p(3 * 4))
-				if self._hasColors and not overrideColor:
+				if self._hasColors and colorMode == 0:
 					glColorPointer(3, GL_FLOAT, self._stride, c_void_p(self._colorOffset))
+				if self._hasIdColors and colorMode == 1:
+					glColorPointer(3, GL_UNSIGNED_BYTE, self._stride, c_void_p(self._idColorOffset))
 				if self._hasIndices:
 					glDrawElements(self._renderType, self._size, GL_UNSIGNED_INT, c_void_p(0))
 				else:
@@ -261,7 +257,7 @@ class GLVBO(GLReferenceCounter):
 		glDisableClientState(GL_VERTEX_ARRAY)
 		if self._hasNormals:
 			glDisableClientState(GL_NORMAL_ARRAY)
-		if self._hasColors and not overrideColor:
+		if self._hasColors and colorMode == 0 or self._hasIdColors and colorMode == 1:
 			glDisableClientState(GL_COLOR_ARRAY)
 
 	def release(self):

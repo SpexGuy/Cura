@@ -24,7 +24,7 @@ class engineResultView(object):
 		self._resultLock = threading.Lock()
 		self._layerVBOs = []
 		self._layer20VBOs = []
-		self._semanticColor = False
+		self._colorMode = False
 
 		self.layerSelect = openglGui.glSlider(self._parent, 10000, 1, 1, (-1,-2), lambda : self._parent.QueueRefresh())
 		self.singleLayerToggle = openglGui.glButton(self._parent, 23, _("Single Layer"), (-1,-1.5), self.OnSingleLayerToggle, 0.5) #stay half size of the base size
@@ -50,7 +50,7 @@ class engineResultView(object):
 		self._resultLock.release()
 
 	def setSemanticColor(self, sc):
-		self._semanticColor = sc
+		self._colorMode = -1 if sc else 0
 
 	def OnSingleLayerToggle(self, button):
 		self._singleLayer = not self._singleLayer
@@ -144,7 +144,7 @@ class engineResultView(object):
 
 								if not self._singleLayer or n == layerNr - 1:
 									glColor4f(color[0]*0.5,color[1]*0.5,color[2]*0.5,color[3])
-									layerVBOs[typeName].render(self._semanticColor)
+									layerVBOs[typeName].render(self._colorMode)
 					n -= 20
 				else:
 					c = 1.0 - ((layerNr - n) - 1) * 0.05
@@ -161,13 +161,13 @@ class engineResultView(object):
 
 							if not self._singleLayer or n == layerNr - 1:
 								glColor4f(color[0]*c,color[1]*c,color[2]*c,color[3])
-								layerVBOs['GCODE-' + typeName].render(self._semanticColor)
+								layerVBOs['GCODE-' + typeName].render(self._colorMode)
 
 						if n == layerNr - 1:
 							if 'GCODE-MOVE' not in layerVBOs:
 								layerVBOs['GCODE-MOVE'] = self._gcodeToVBO_lines(gcodeLayers[n+1:n+2])
 							glColor4f(0,0,c,1)
-							layerVBOs['GCODE-MOVE'].render(self._semanticColor)
+							layerVBOs['GCODE-MOVE'].render(self._colorMode)
 					elif n < len(result._polygons):
 						polygons = result._polygons[n]
 						for typeName, typeNameGCode, color in lineTypeList:
@@ -177,7 +177,7 @@ class engineResultView(object):
 
 								if not self._singleLayer or n == layerNr - 1:
 									glColor4f(color[0]*c,color[1]*c,color[2]*c,color[3])
-									layerVBOs[typeName].render(self._semanticColor)
+									layerVBOs[typeName].render(self._colorMode)
 					n -= 1
 		glShadeModel(GL_SMOOTH)
 		glPopMatrix()
