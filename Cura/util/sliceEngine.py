@@ -291,10 +291,10 @@ class Engine(object):
 					polygonColors = numpy.array(numpy.fromstring(data, numpy.float32), numpy.float32)
 					polygonColors = polygonColors.reshape((len(polygonColors) / 3, 3))
 					polygon = numpy.empty((len(polygon2d), 3), numpy.float32)
-					polygon[:,:2] = polygon2d
+					polygon[:,:-1] = polygon2d
 					polygon[:,2] = z
-					#polygon[:,3:] = polygonColors
-					polygons[typeName].append(polygon)
+					polygonColors[polygonColors < 0] = 1.0 # replace bad colors with white
+					polygons[typeName].append((polygon, polygonColors))
 			elif cmd == self.GUI_CMD_FINISH_OBJECT:
 				layerNrOffset = len(self._result._polygons)
 			else:

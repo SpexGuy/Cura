@@ -218,17 +218,17 @@ class GLVBO(GLReferenceCounter):
 				glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self._bufferIndices)
 				glBufferData(GL_ELEMENT_ARRAY_BUFFER, numpy.array(indicesArray, numpy.uint32), GL_STATIC_DRAW)
 
-	def render(self):
+	def render(self, overrideColor = False):
 		glEnableClientState(GL_VERTEX_ARRAY)
 		if self._hasNormals:
 			glEnableClientState(GL_NORMAL_ARRAY)
-		if self._hasColors:
+		if self._hasColors and not overrideColor:
 			glEnableClientState(GL_COLOR_ARRAY)
 		if self._buffers is None:
 			glVertexPointer(3, GL_FLOAT, 0, self._vertexArray)
 			if self._hasNormals:
 				glNormalPointer(GL_FLOAT, 0, self._normalArray)
-			if self._hasColors:
+			if self._hasColors and not overrideColor:
 				glColorPointer(3, GL_FLOAT, 0, self._colorsArray)
 			if self._hasIndices:
 				glDrawElements(self._renderType, self._size, GL_UNSIGNED_INT, self._indicesArray)
@@ -247,7 +247,7 @@ class GLVBO(GLReferenceCounter):
 				glVertexPointer(3, GL_FLOAT, self._stride, c_void_p(0))
 				if self._hasNormals:
 					glNormalPointer(GL_FLOAT, self._stride, c_void_p(3 * 4))
-				if self._hasColors:
+				if self._hasColors and not overrideColor:
 					glColorPointer(3, GL_FLOAT, self._stride, c_void_p(self._colorOffset))
 				if self._hasIndices:
 					glDrawElements(self._renderType, self._size, GL_UNSIGNED_INT, c_void_p(0))
@@ -261,7 +261,7 @@ class GLVBO(GLReferenceCounter):
 		glDisableClientState(GL_VERTEX_ARRAY)
 		if self._hasNormals:
 			glDisableClientState(GL_NORMAL_ARRAY)
-		if self._hasColors:
+		if self._hasColors and not overrideColor:
 			glDisableClientState(GL_COLOR_ARRAY)
 
 	def release(self):

@@ -559,17 +559,17 @@ class SceneView(openglGui.glGuiPanel):
 			self.OnToolSelect(0)
 
 	def OnViewChange(self):
-		if self.viewSelection.getValue() == 4:
+		view = self.viewSelection.getValue()
+		if view == 4 or view == 5:
 			self.viewMode = 'gcode'
 			self.tool = previewTools.toolNone(self)
-		elif self.viewSelection.getValue() == 1:
+			self._engineResultView.setSemanticColor(view == 4)
+		elif view == 1:
 			self.viewMode = 'overhang'
-		elif self.viewSelection.getValue() == 2:
+		elif view == 2:
 			self.viewMode = 'transparent'
-		elif self.viewSelection.getValue() == 3:
+		elif view == 3:
 			self.viewMode = 'xray'
-		elif self.viewSelection.getValue() == 5:
-			self.viewMode = 'layerColors'
 		else:
 			self.viewMode = 'normal'
 		self._engineResultView.setEnabled(self.viewMode == 'gcode')
@@ -1352,7 +1352,7 @@ class SceneView(openglGui.glGuiPanel):
 			for n in xrange(0, len(self._scene.objects())):
 				obj = self._scene.objects()[n]
 				glColor4ub((n >> 16) & 0xFF, (n >> 8) & 0xFF, (n >> 0) & 0xFF, 0xFF)
-				self._renderObject(obj)
+				self._renderObject(obj, overrideColor=True)
 
 		if self._mouseX > -1: # mouse has not passed over the opengl window.
 			glFlush()
@@ -1558,7 +1558,7 @@ class SceneView(openglGui.glGuiPanel):
 			openglHelpers.glDrawStringCenter(_("Colors view not working due to lack of OpenGL shaders support."))
 			glPopMatrix()
 
-	def _renderObject(self, obj, brightness = 0, addSink = True):
+	def _renderObject(self, obj, brightness = 0, addSink = True, overrideColor = False):
 		glPushMatrix()
 		if addSink:
 			glTranslate(obj.getPosition()[0], obj.getPosition()[1], obj.getSize()[2] / 2 - profile.getProfileSettingFloat('object_sink'))
@@ -1580,7 +1580,7 @@ class SceneView(openglGui.glGuiPanel):
 			if brightness != 0:
 				glColor4fv(map(lambda idx: idx * brightness, self._objColors[n]))
 				n += 1
-			m.vbo.render()
+			m.vbo.render(overrideColor)
 		glPopMatrix()
 
 	def _drawMachine(self):

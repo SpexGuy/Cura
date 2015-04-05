@@ -14,7 +14,7 @@ import cStringIO as StringIO
 
 from Cura.util import profile
 
-def gcodePath(newType, pathType, layerThickness, startPoint):
+def gcodePath(newType, pathType, layerThickness, startPoint, startColor):
 	"""
 	Build a gcodePath object. This used to be objects, however, this code is timing sensitive and dictionaries proved to be faster.
 	"""
@@ -26,7 +26,8 @@ def gcodePath(newType, pathType, layerThickness, startPoint):
 			'pathType': pathType,
 			'layerThickness': layerThickness,
 			'points': [startPoint],
-			'extrusion': [0.0]}
+			'extrusion': [0.0],
+			'colors': [startColor]}
 
 class gcode(object):
 	"""
@@ -76,6 +77,7 @@ class gcode(object):
 		self.layerList = []
 		pos = [0.0,0.0,0.0]
 		posOffset = [0.0, 0.0, 0.0]
+		currentColor = [1.0, 1.0, 1.0]
 		currentE = 0.0
 		currentExtruder = 0
 		extrudeAmountMultiply = 1.0
@@ -87,7 +89,7 @@ class gcode(object):
 		layerThickness = 0.1
 		pathType = 'CUSTOM'
 		currentLayer = []
-		currentPath = gcodePath('move', pathType, layerThickness, pos)
+		currentPath = gcodePath('move', pathType, layerThickness, pos, currentColor)
 		currentPath['extruder'] = currentExtruder
 
 		currentLayer.append(currentPath)
@@ -98,6 +100,10 @@ class gcode(object):
 			#Parse Cura_SF comments
 			if line.startswith(';TYPE:'):
 				pathType = line[6:].strip()
+			elif line.startswith(';COLOR_START'):
+				currentColor = map(float, line[12:].strip().split())
+			elif line.startswith(';COLOR_STOP'):
+				currentColor = [1.0, 1.0, 1.0]
 
 			if ';' in line:
 				comment = line[line.find(';')+1:].strip()
@@ -110,7 +116,7 @@ class gcode(object):
 					pathType = 'SKIRT'
 				#Cura layer comments.
 				if comment.startswith('LAYER:'):
-					currentPath = gcodePath(moveType, pathType, layerThickness, currentPath['points'][-1])
+					currentPath = gcodePath(moveType, pathType, layerThickness, currentPath['points'][-1], currentColor)
 					layerThickness = 0.0
 					currentPath['extruder'] = currentExtruder
 					for path in currentLayer:
@@ -166,20 +172,22 @@ class gcode(object):
 						if layerThickness == 0.0:
 							layerThickness = abs(oldPos[2] - pos[2])
 					if currentPath['type'] != moveType or currentPath['pathType'] != pathType:
-						currentPath = gcodePath(moveType, pathType, layerThickness, currentPath['points'][-1])
+						currentPath = gcodePath(moveType, pathType, layerThickness, currentPath['points'][-1], currentColor)
 						currentPath['extruder'] = currentExtruder
 						currentLayer.append(currentPath)
 
 					currentPath['points'].append(pos)
 					currentPath['extrusion'].append(e * extrudeAmountMultiply)
+					currentPath['colors'].append(currentColor)
 				elif G == 4:	#Delay
 					S = getCodeFloat(line, 'S')
 					P = getCodeFloat(line, 'P')
 				elif G == 10:	#Retract
-					currentPath = gcodePath('retract', pathType, layerThickness, currentPath['points'][-1])
+					currentPath = gcodePath('retract', pathType, layerThickness, currentPath['points'][-1], currentColor)
 					currentPath['extruder'] = currentExtruder
 					currentLayer.append(currentPath)
 					currentPath['points'].append(currentPath['points'][0])
+					currentPath['colors'].append(currentColor)
 				elif G == 11:	#Push back after retract
 					pass
 				elif G == 20:	#Units are inches
@@ -286,6 +294,7 @@ class gcode(object):
 
 		for path in currentLayer:
 			path['points'] = numpy.array(path['points'], numpy.float32)
+			path['colors'] = numpy.array(path['colors'], numpy.float32)
 			path['extrusion'] = numpy.array(path['extrusion'], numpy.float32)
 		self.layerList.append(currentLayer)
 		if self.progressCallback is not None and self._fileSize > 0:

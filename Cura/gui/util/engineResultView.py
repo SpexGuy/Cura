@@ -24,6 +24,7 @@ class engineResultView(object):
 		self._resultLock = threading.Lock()
 		self._layerVBOs = []
 		self._layer20VBOs = []
+		self._semanticColor = False
 
 		self.layerSelect = openglGui.glSlider(self._parent, 10000, 1, 1, (-1,-2), lambda : self._parent.QueueRefresh())
 		self.singleLayerToggle = openglGui.glButton(self._parent, 23, _("Single Layer"), (-1,-1.5), self.OnSingleLayerToggle, 0.5) #stay half size of the base size
@@ -47,6 +48,9 @@ class engineResultView(object):
 		self._layerVBOs = []
 		self._layer20VBOs = []
 		self._resultLock.release()
+
+	def setSemanticColor(self, sc):
+		self._semanticColor = sc
 
 	def OnSingleLayerToggle(self, button):
 		self._singleLayer = not self._singleLayer
@@ -86,6 +90,7 @@ class engineResultView(object):
 			gcodeLayers = None
 
 		glPushMatrix()
+		glShadeModel(GL_FLAT)
 		glEnable(GL_BLEND)
 		if profile.getMachineSetting('machine_center_is_zero') != 'True':
 			glTranslate(-profile.getMachineSettingFloat('machine_width') / 2, -profile.getMachineSettingFloat('machine_depth') / 2, 0)
@@ -94,8 +99,8 @@ class engineResultView(object):
 		layerNr = self.layerSelect.getValue()
 		if layerNr == self.layerSelect.getMaxValue() and result is not None and len(result._polygons) > 0:
 			layerNr = max(layerNr, len(result._polygons))
-		if result is not None and len(result._polygons) > layerNr-1 and 'inset0' in result._polygons[layerNr-1] and len(result._polygons[layerNr-1]['inset0']) > 0 and len(result._polygons[layerNr-1]['inset0'][0]) > 0:
-			viewZ = result._polygons[layerNr-1]['inset0'][0][0][2]
+		if result is not None and len(result._polygons) > layerNr-1 and 'inset0' in result._polygons[layerNr-1] and len(result._polygons[layerNr-1]['inset0']) > 0 and len(result._polygons[layerNr-1]['inset0'][0][0]) > 0:
+			viewZ = result._polygons[layerNr-1]['inset0'][0][0][0][2]
 		else:
 			viewZ = (layerNr - 1) * profile.getProfileSettingFloat('layer_height') + profile.getProfileSettingFloat('bottom_thickness')
 		self._parent._viewTarget[2] = viewZ
@@ -139,7 +144,7 @@ class engineResultView(object):
 
 								if not self._singleLayer or n == layerNr - 1:
 									glColor4f(color[0]*0.5,color[1]*0.5,color[2]*0.5,color[3])
-									layerVBOs[typeName].render()
+									layerVBOs[typeName].render(self._semanticColor)
 					n -= 20
 				else:
 					c = 1.0 - ((layerNr - n) - 1) * 0.05
@@ -156,13 +161,13 @@ class engineResultView(object):
 
 							if not self._singleLayer or n == layerNr - 1:
 								glColor4f(color[0]*c,color[1]*c,color[2]*c,color[3])
-								layerVBOs['GCODE-' + typeName].render()
+								layerVBOs['GCODE-' + typeName].render(self._semanticColor)
 
 						if n == layerNr - 1:
 							if 'GCODE-MOVE' not in layerVBOs:
 								layerVBOs['GCODE-MOVE'] = self._gcodeToVBO_lines(gcodeLayers[n+1:n+2])
 							glColor4f(0,0,c,1)
-							layerVBOs['GCODE-MOVE'].render()
+							layerVBOs['GCODE-MOVE'].render(self._semanticColor)
 					elif n < len(result._polygons):
 						polygons = result._polygons[n]
 						for typeName, typeNameGCode, color in lineTypeList:
@@ -172,8 +177,9 @@ class engineResultView(object):
 
 								if not self._singleLayer or n == layerNr - 1:
 									glColor4f(color[0]*c,color[1]*c,color[2]*c,color[3])
-									layerVBOs[typeName].render()
+									layerVBOs[typeName].render(self._semanticColor)
 					n -= 1
+		glShadeModel(GL_SMOOTH)
 		glPopMatrix()
 		if generatedVBO:
 			self._parent._queueRefresh()
@@ -190,7 +196,9 @@ class engineResultView(object):
 	def _polygonsToVBO_lines(self, polygons):
 		verts = numpy.zeros((0, 3), numpy.float32)
 		indices = numpy.zeros((0), numpy.uint32)
-		for poly in polygons:
+		colors = numpy.zeros((0, 3), numpy.float32)
+		for polyInfo in polygons:
+			poly = polyInfo[0]
 			if len(poly) > 2:
 				i = numpy.arange(len(verts), len(verts) + len(poly) + 1, 1, numpy.uint32)
 				i[-1] = len(verts)
@@ -199,12 +207,15 @@ class engineResultView(object):
 				i = numpy.arange(len(verts), len(verts) + len(poly), 1, numpy.uint32)
 			indices = numpy.concatenate((indices, i), 0)
 			verts = numpy.concatenate((verts, poly), 0)
-		return openglHelpers.GLVBO(GL_LINES, verts, indicesArray=indices)
+			colors = numpy.concatenate((colors, polyInfo[1]), 0)
+		return openglHelpers.GLVBO(GL_LINES, verts, indicesArray=indices, colorsArray=colors)
 
 	def _polygonsToVBO_quads(self, polygons):
 		verts = numpy.zeros((0, 3), numpy.float32)
 		indices = numpy.zeros((0), numpy.uint32)
-		for poly in polygons:
+		colors = numpy.zeros((0, 3), numpy.float32)
+		for polyInfo in polygons:
+			poly = polyInfo[0]
 			i = numpy.arange(len(verts), len(verts) + len(poly) + 1, 1, numpy.uint32)
 			i2 = numpy.arange(len(verts) + len(poly), len(verts) + len(poly) + len(poly) + 1, 1, numpy.uint32)
 			i[-1] = len(verts)
@@ -213,7 +224,9 @@ class engineResultView(object):
 			indices = numpy.concatenate((indices, i), 0)
 			verts = numpy.concatenate((verts, poly), 0)
 			verts = numpy.concatenate((verts, poly * numpy.array([1,0,1],numpy.float32) + numpy.array([0,-100,0],numpy.float32)), 0)
-		return openglHelpers.GLVBO(GL_QUADS, verts, indicesArray=indices)
+			# TODO: this probably doesn't work, but this method isn't used so it doesn't matter.
+			colors = numpy.concatenate((colors, polyInfo[1]), 0)
+		return openglHelpers.GLVBO(GL_QUADS, verts, indicesArray=indices, colorsArray=colors)
 
 	def _gcodeToVBO_lines(self, gcodeLayers, extrudeType):
 		if ':' in extrudeType:
@@ -244,11 +257,16 @@ class engineResultView(object):
 			extruder = None
 
 		verts = numpy.zeros((0, 3), numpy.float32)
+		colors = numpy.zeros((0, 3), numpy.float32)
 		indices = numpy.zeros((0), numpy.uint32)
 		for layer in gcodeLayers:
 			for path in layer:
 				if path['type'] == 'extrude' and path['pathType'] == extrudeType and (extruder is None or path['extruder'] == extruder):
 					a = path['points']
+					c = path['colors']
+					assert(len(a) == len(c))
+					if len(a) == 1:
+						continue
 					if extrudeType == 'FILL':
 						a[:,2] += 0.01
 
@@ -274,11 +292,16 @@ class engineResultView(object):
 					b = numpy.concatenate((b, a[:-1] + normals), 1)
 					b = b.reshape((len(b) * 4, 3))
 
+					d = numpy.zeros((len(a)-1, 4 * 3), numpy.float32)
+					d[:,9:12] = c[1:]
+					d = d.reshape((len(d)*4, 3))
+
 					i = numpy.arange(len(verts), len(verts) + len(b), 1, numpy.uint32)
 
 					verts = numpy.concatenate((verts, b))
 					indices = numpy.concatenate((indices, i))
-		return openglHelpers.GLVBO(GL_QUADS, verts, indicesArray=indices)
+					colors = numpy.concatenate((colors, d))
+		return openglHelpers.GLVBO(GL_QUADS, verts, indicesArray=indices, colorsArray=colors)
 
 	def _gcodeToVBO_lines(self, gcodeLayers):
 		verts = numpy.zeros((0,3), numpy.float32)
