@@ -1378,7 +1378,7 @@ class SceneView(openglGui.glGuiPanel):
 				else:
 					self._focusObj = None
 			f = glReadPixels(self._mouseX, self.GetSize().GetHeight() - 1 - self._mouseY, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT)[0][0]
-			self.GetTopLevelParent().SetTitle(hex(n) + " " + str(f))
+			#self.GetTopLevelParent().SetTitle(hex(n) + " " + str(f))
 			self._mouse3Dpos = openglHelpers.unproject(self._mouseX, self._viewport[1] + self._viewport[3] - self._mouseY, f, self._modelMatrix, self._projMatrix, self._viewport)
 			self._mouse3Dpos -= self._viewTarget
 		self._init3DView()
