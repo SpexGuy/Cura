@@ -296,6 +296,9 @@ class printableObject(object):
 			meshList.append(numpy.array(meshIdxList, numpy.int32))
 		return numpy.array(vertexList, numpy.float32), meshList
 
+	def setColor(self, trig, color):
+		self._meshList[0].setColor(trig, color)
+
 class mesh(object):
 	"""
 	A mesh is a list of 3D triangles build from vertexes. Each triangle has 3 vertexes.
@@ -337,7 +340,7 @@ class mesh(object):
 			self.colors[n][2] = b
 		self.vertexCount += 3
 	
-	def _prepareFaceCount(self, faceNumber, useColors=False):
+	def _prepareFaceCount(self, faceNumber, useColors=True):
 		#Set the amount of faces before loading data in them. This way we can create the numpy arrays before we fill them.
 		self.vertexes = numpy.zeros((faceNumber*3, 3), numpy.float32)
 		self.normal = numpy.zeros((faceNumber*3, 3), numpy.float32)
@@ -370,6 +373,14 @@ class mesh(object):
 		for i in map[vHash]:
 			if numpy.linalg.norm(self.vertexes[i] - self.vertexes[idx]) < 0.001:
 				return i
+
+	def setColor(self, trig, color):
+		idx = trig*3
+		self.colors[idx+0] = color
+		self.colors[idx+1] = color
+		self.colors[idx+2] = color
+		if self.vbo is not None:
+			self.vbo.setColor(trig, color)
 
 	def getTransformedVertexes(self, applyOffsets = False):
 		if applyOffsets:

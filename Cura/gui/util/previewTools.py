@@ -38,10 +38,15 @@ class toolPaint(object):
 		pass
 
 	def OnDragStart(self, p0, p1):
+		trig = self.parent._paintTriangle
+		if trig < 0:
+			return False
+		color = self.parent.layerColorer.getColor()
+		self.parent._selectedObj.setColor(trig, color)
 		return True
 
 	def OnDrag(self, p0, p1):
-		pass
+		self.OnDragStart(p0, p1)
 
 	def OnDragEnd(self):
 		pass

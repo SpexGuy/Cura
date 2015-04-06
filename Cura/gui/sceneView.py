@@ -58,6 +58,7 @@ class SceneView(openglGui.glGuiPanel):
 		self._isSimpleMode = True
 		self._printerConnectionManager = printerConnectionManager.PrinterConnectionManager()
 		self._colorConnectionManager = printerConnectionManager.ColorConnectionManager()
+		self._paintTriangle = -1
 
 		self._viewport = None
 		self._modelMatrix = None
@@ -1370,7 +1371,7 @@ class SceneView(openglGui.glGuiPanel):
 			glFlush()
 			n = glReadPixels(self._mouseX, self.GetSize().GetHeight() - 1 - self._mouseY, 1, 1, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8)[0][0] >> 8
 			if self.viewMode == 'paint':
-				self._paintTriangle = n
+				self._paintTriangle = n if n != 0xFFFFFF else -1
 			else:
 				if n < len(self._scene.objects()):
 					self._focusObj = self._scene.objects()[n]
@@ -1595,7 +1596,7 @@ class SceneView(openglGui.glGuiPanel):
 		n = 0
 		for m in obj._meshList:
 			if m.vbo is None:
-				m.vbo = openglHelpers.GLVBO(GL_TRIANGLES, m.vertexes, m.normal, colorsArray=m.colors, generateIdColors=True)
+				m.vbo = openglHelpers.GLVBO(GL_TRIANGLES, m.vertexes, m.normal, colorsArray=m.colors, generateIdColors=True, mutable=True)
 			if brightness != 0:
 				glColor4fv(map(lambda idx: idx * brightness, self._objColors[n]))
 				n += 1
