@@ -73,7 +73,8 @@ class SceneView(openglGui.glGuiPanel):
 		group = []
 		self.rotateToolButton = openglGui.glRadioButton(self, 8, _("Rotate"), (0,-1), group, self.OnToolSelect)
 		self.scaleToolButton  = openglGui.glRadioButton(self, 9, _("Scale"), (1,-1), group, self.OnToolSelect)
-		self.mirrorToolButton  = openglGui.glRadioButton(self, 10, _("Mirror"), (2,-1), group, self.OnToolSelect)
+		self.mirrorToolButton = openglGui.glRadioButton(self, 10, _("Mirror"), (2,-1), group, self.OnToolSelect)
+		self.paintToolButton  = openglGui.glRadioButton(self, 23, _("Paint"), (3,-1), group, self.OnPaintView)
 
 		self.resetRotationButton = openglGui.glButton(self, 12, _("Reset"), (0,-2), self.OnRotateReset)
 		self.layFlatButton       = openglGui.glButton(self, 16, _("Lay flat"), (0,-3), self.OnLayFlat)
@@ -134,8 +135,6 @@ class SceneView(openglGui.glGuiPanel):
 		self._maxSelectedLayer = self.layerColors.getMaxSelect()
 		self._colorLayers = self.layerColors.getLayers()
 		self._colorColors = self.layerColors.getColors()
-
-
 
 	def loadGCodeFile(self, filename):
 		self.OnDeleteAll(None)
@@ -224,7 +223,6 @@ class SceneView(openglGui.glGuiPanel):
 
 		self._scene.arrangeAll(True)
 		self._scene.centerAll()
-
 
 	def OnResetTransformations(self, e):
 		for obj in self._scene.objects():
@@ -526,6 +524,11 @@ class SceneView(openglGui.glGuiPanel):
 		dlg.ShowModal()
 		dlg.Destroy()
 
+	def OnPaintView(self, button):
+		self.OnToolSelect(0)
+		if self.paintToolButton.getSelected():
+			self.viewMode = 'paint'
+
 	def OnToolSelect(self, button):
 		if self.rotateToolButton.getSelected():
 			self.tool = previewTools.toolRotate(self)
@@ -533,6 +536,8 @@ class SceneView(openglGui.glGuiPanel):
 			self.tool = previewTools.toolScale(self)
 		elif self.mirrorToolButton.getSelected():
 			self.tool = previewTools.toolNone(self)
+		elif self.paintToolButton.getSelected():
+			self.tool = previewTools.toolPaint(self)
 		else:
 			self.tool = previewTools.toolNone(self)
 		self.resetRotationButton.setHidden(not self.rotateToolButton.getSelected())
@@ -543,6 +548,8 @@ class SceneView(openglGui.glGuiPanel):
 		self.mirrorXButton.setHidden(not self.mirrorToolButton.getSelected())
 		self.mirrorYButton.setHidden(not self.mirrorToolButton.getSelected())
 		self.mirrorZButton.setHidden(not self.mirrorToolButton.getSelected())
+		self.layerColorer.setHidden(not self.paintToolButton.getSelected())
+		self.OnViewChange()
 
 	def updateToolButtons(self):
 		if self._selectedObj is None:
@@ -552,10 +559,12 @@ class SceneView(openglGui.glGuiPanel):
 		self.rotateToolButton.setHidden(hidden)
 		self.scaleToolButton.setHidden(hidden)
 		self.mirrorToolButton.setHidden(hidden)
+		self.paintToolButton.setHidden(hidden)
 		if hidden:
 			self.rotateToolButton.setSelected(False)
 			self.scaleToolButton.setSelected(False)
 			self.mirrorToolButton.setSelected(False)
+			self.paintToolButton.setSelected(False)
 			self.OnToolSelect(0)
 
 	def OnViewChange(self):
@@ -870,7 +879,6 @@ class SceneView(openglGui.glGuiPanel):
 		self.updateModelSettingsToControls()
 		self.updateLayerRange()
 
-
 	def updateModelSettingsToControls(self):
 		if self._selectedObj is not None:
 			scale = self._selectedObj.getScale()
@@ -890,10 +898,10 @@ class SceneView(openglGui.glGuiPanel):
 			numLayers = int(math.ceil(tallestObject.getSize()[2] / self._layerHeight))
 			self.layerColors.setRange(0, max(numLayers, 1))
 			self.layerColors.setHidden(False)
-			self.layerColorer.setHidden(False)
+#			self.layerColorer.setHidden(False)
 		else:
 			self.layerColors.setHidden(True)
-			self.layerColorer.setHidden(True)
+#			self.layerColorer.setHidden(True)
 
 	def OnKeyChar(self, keyCode):
 		if self._engineResultView.OnKeyChar(keyCode):
@@ -994,7 +1002,7 @@ class SceneView(openglGui.glGuiPanel):
 		p0, p1 = self.getMouseRay(self._mouseX, self._mouseY)
 		p0 -= self.getObjectCenterPos() - self._viewTarget
 		p1 -= self.getObjectCenterPos() - self._viewTarget
-		if self.tool.OnDragStart(p0, p1):
+		if e.GetButton() == 1 and self.tool.OnDragStart(p0, p1):
 			self._mouseState = 'tool'
 		if self._mouseState == 'dragOrClick':
 			if e.GetButton() == 1:
@@ -1348,24 +1356,30 @@ class SceneView(openglGui.glGuiPanel):
 		glClearColor(1,1,1,1)
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT)
 
-		if self.viewMode != 'gcode':
+		if self.viewMode != 'gcode' and self.viewMode != 'paint':
 			for n in xrange(0, len(self._scene.objects())):
 				obj = self._scene.objects()[n]
 				glColor4ub((n >> 16) & 0xFF, (n >> 8) & 0xFF, (n >> 0) & 0xFF, 0xFF)
 				self._renderObject(obj, colorMode=-1)
+		elif self.viewMode == 'paint':
+			glShadeModel(GL_FLAT)
+			self._renderObject(self._selectedObj, colorMode=1)
+			glShadeModel(GL_SMOOTH)
 
 		if self._mouseX > -1: # mouse has not passed over the opengl window.
 			glFlush()
 			n = glReadPixels(self._mouseX, self.GetSize().GetHeight() - 1 - self._mouseY, 1, 1, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8)[0][0] >> 8
-			if n < len(self._scene.objects()):
-				self._focusObj = self._scene.objects()[n]
+			if self.viewMode == 'paint':
+				self._paintTriangle = n
 			else:
-				self._focusObj = None
+				if n < len(self._scene.objects()):
+					self._focusObj = self._scene.objects()[n]
+				else:
+					self._focusObj = None
 			f = glReadPixels(self._mouseX, self.GetSize().GetHeight() - 1 - self._mouseY, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT)[0][0]
-			#self.GetTopLevelParent().SetTitle(hex(n) + " " + str(f))
+			self.GetTopLevelParent().SetTitle(hex(n) + " " + str(f))
 			self._mouse3Dpos = openglHelpers.unproject(self._mouseX, self._viewport[1] + self._viewport[3] - self._mouseY, f, self._modelMatrix, self._projMatrix, self._viewport)
 			self._mouse3Dpos -= self._viewTarget
-
 		self._init3DView()
 		glTranslate(0,0,-self._zoom)
 		glRotate(-self._pitch, 1,0,0)
@@ -1391,53 +1405,57 @@ class SceneView(openglGui.glGuiPanel):
 				self._layerShader.setUniform('layer_height', self._layerHeight)
 			else:
 				self._objectShader.bind()
-			for obj in self._scene.objects():
-				if obj._loadAnim is not None:
-					if obj._loadAnim.isDone():
-						obj._loadAnim = None
-					else:
-						continue
-				brightness = 1.0
-				if self._focusObj == obj:
-					brightness = 1.2
-				elif self._focusObj is not None or self._selectedObj is not None and obj != self._selectedObj:
-					brightness = 0.8
 
-				if self._selectedObj == obj or self._selectedObj is None:
-					#If we want transparent, then first render a solid black model to remove the printer size lines.
-					if self.viewMode == 'transparent':
-						glColor4f(0, 0, 0, 0)
+			if self.viewMode == 'paint':
+				self._renderObject(self._selectedObj)
+			else:
+				for obj in self._scene.objects():
+					if obj._loadAnim is not None:
+						if obj._loadAnim.isDone():
+							obj._loadAnim = None
+						else:
+							continue
+					brightness = 1.0
+					if self._focusObj == obj:
+						brightness = 1.2
+					elif self._focusObj is not None or self._selectedObj is not None and obj != self._selectedObj:
+						brightness = 0.8
+
+					if self._selectedObj == obj or self._selectedObj is None:
+						#If we want transparent, then first render a solid black model to remove the printer size lines.
+						if self.viewMode == 'transparent':
+							glColor4f(0, 0, 0, 0)
+							self._renderObject(obj)
+							glEnable(GL_BLEND)
+							glBlendFunc(GL_ONE, GL_ONE)
+							glDisable(GL_DEPTH_TEST)
+							brightness *= 0.5
+						if self.viewMode == 'xray':
+							glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE)
+						glStencilOp(GL_INCR, GL_INCR, GL_INCR)
+						glEnable(GL_STENCIL_TEST)
+
+					if self.viewMode == 'overhang':
+						if self._selectedObj == obj and self.tempMatrix is not None:
+							self._objectOverhangShader.setUniform('rotMatrix', obj.getMatrix() * self.tempMatrix)
+						else:
+							self._objectOverhangShader.setUniform('rotMatrix', obj.getMatrix())
+					elif self.viewMode == 'layerColors':
+						pos = obj.getPosition()
+						height = -profile.getProfileSettingFloat('object_sink')
+						offset = obj.getDrawOffset()
+						modelMatrix = openglHelpers.convert3x3MatrixTo4x4(obj.getMatrix(), [-offset[0]+pos[0], -offset[1]+pos[1], -offset[2]+height])
+						self._layerShader.setUniformMat4('model_matrix', modelMatrix)
+
+					if not self._scene.checkPlatform(obj):
+						glColor4f(0.5 * brightness, 0.5 * brightness, 0.5 * brightness, 0.8 * brightness)
 						self._renderObject(obj)
-						glEnable(GL_BLEND)
-						glBlendFunc(GL_ONE, GL_ONE)
-						glDisable(GL_DEPTH_TEST)
-						brightness *= 0.5
-					if self.viewMode == 'xray':
-						glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE)
-					glStencilOp(GL_INCR, GL_INCR, GL_INCR)
-					glEnable(GL_STENCIL_TEST)
-
-				if self.viewMode == 'overhang':
-					if self._selectedObj == obj and self.tempMatrix is not None:
-						self._objectOverhangShader.setUniform('rotMatrix', obj.getMatrix() * self.tempMatrix)
 					else:
-						self._objectOverhangShader.setUniform('rotMatrix', obj.getMatrix())
-				elif self.viewMode == 'layerColors':
-					pos = obj.getPosition()
-					height = -profile.getProfileSettingFloat('object_sink')
-					offset = obj.getDrawOffset()
-					modelMatrix = openglHelpers.convert3x3MatrixTo4x4(obj.getMatrix(), [-offset[0]+pos[0], -offset[1]+pos[1], -offset[2]+height])
-					self._layerShader.setUniformMat4('model_matrix', modelMatrix)
-
-				if not self._scene.checkPlatform(obj):
-					glColor4f(0.5 * brightness, 0.5 * brightness, 0.5 * brightness, 0.8 * brightness)
-					self._renderObject(obj)
-				else:
-					self._renderObject(obj, brightness)
-				glDisable(GL_STENCIL_TEST)
-				glDisable(GL_BLEND)
-				glEnable(GL_DEPTH_TEST)
-				glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE)
+						self._renderObject(obj, brightness)
+					glDisable(GL_STENCIL_TEST)
+					glDisable(GL_BLEND)
+					glEnable(GL_DEPTH_TEST)
+					glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE)
 
 			if self.viewMode == 'xray':
 				glPushMatrix()
@@ -1516,31 +1534,32 @@ class SceneView(openglGui.glGuiPanel):
 				glDepthMask(True)
 				glDisable(GL_CULL_FACE)
 
-			#Draw the outline of the selected object on top of everything else except the GUI.
-			if self._selectedObj is not None and self._selectedObj._loadAnim is None:
-				glDisable(GL_DEPTH_TEST)
-				glEnable(GL_CULL_FACE)
-				glEnable(GL_STENCIL_TEST)
-				glDisable(GL_BLEND)
-				glStencilFunc(GL_EQUAL, 0, 255)
+			if self.viewMode != 'paint':
+				#Draw the outline of the selected object on top of everything else except the GUI.
+				if self._selectedObj is not None and self._selectedObj._loadAnim is None:
+					glDisable(GL_DEPTH_TEST)
+					glEnable(GL_CULL_FACE)
+					glEnable(GL_STENCIL_TEST)
+					glDisable(GL_BLEND)
+					glStencilFunc(GL_EQUAL, 0, 255)
 
-				glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-				glLineWidth(2)
-				glColor4f(1,1,1,0.5)
-				self._renderObject(self._selectedObj)
-				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+					glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+					glLineWidth(2)
+					glColor4f(1,1,1,0.5)
+					self._renderObject(self._selectedObj)
+					glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
 
-				glViewport(0, 0, self.GetSize().GetWidth(), self.GetSize().GetHeight())
-				glDisable(GL_STENCIL_TEST)
-				glDisable(GL_CULL_FACE)
-				glEnable(GL_DEPTH_TEST)
+					glViewport(0, 0, self.GetSize().GetWidth(), self.GetSize().GetHeight())
+					glDisable(GL_STENCIL_TEST)
+					glDisable(GL_CULL_FACE)
+					glEnable(GL_DEPTH_TEST)
 
-			if self._selectedObj is not None:
-				glPushMatrix()
-				pos = self.getObjectCenterPos()
-				glTranslate(pos[0], pos[1], pos[2])
-				self.tool.OnDraw()
-				glPopMatrix()
+				if self._selectedObj is not None:
+					glPushMatrix()
+					pos = self.getObjectCenterPos()
+					glTranslate(pos[0], pos[1], pos[2])
+					self.tool.OnDraw()
+					glPopMatrix()
 		if self.viewMode == 'overhang' and not openglHelpers.hasShaderSupport():
 			glDisable(GL_DEPTH_TEST)
 			glPushMatrix()

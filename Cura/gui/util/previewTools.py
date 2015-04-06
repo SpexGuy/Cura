@@ -30,6 +30,25 @@ class toolNone(object):
 	def OnDraw(self):
 		pass
 
+class toolPaint(object):
+	def __init__(self, parent):
+		self.parent = parent
+
+	def OnMouseMove(self, p0, p1):
+		pass
+
+	def OnDragStart(self, p0, p1):
+		return True
+
+	def OnDrag(self, p0, p1):
+		pass
+
+	def OnDragEnd(self):
+		pass
+
+	def OnDraw(self):
+		pass
+
 class toolInfo(object):
 	def __init__(self, parent):
 		self.parent = parent
