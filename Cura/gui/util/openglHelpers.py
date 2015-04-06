@@ -220,7 +220,7 @@ class GLVBO(GLReferenceCounter):
 		assert(num < (1<<24))
 		idColors = numpy.zeros((num//3, 3*3), numpy.float32)
 		for n in xrange(num//3):
-			idColors[n,6:] = [float((n >> 16) & 0xFF) / (1<<8), float((n >> 8) & 0xFF) / (1<<8), float((n >> 0) & 0xFF) / (1<<8)]
+			idColors[n,6:] = [float((n >> 16) & 0xFF) / (255.0), float((n >> 8) & 0xFF) / (255.0), float((n >> 0) & 0xFF) / (255.0)]
 		return idColors.reshape((num, 3))
 
 	def setColor(self, trig, color):
