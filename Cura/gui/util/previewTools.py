@@ -41,7 +41,7 @@ class toolPaint(object):
 		trig = self.parent._paintTriangle
 		if trig < 0:
 			return False
-		color = self.parent.layerColorer.getColor()
+		color = self.parent._paintColor
 		self.parent._selectedObj.setColor(trig, color)
 		return True
 

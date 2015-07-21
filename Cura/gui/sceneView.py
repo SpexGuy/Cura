@@ -59,6 +59,7 @@ class SceneView(openglGui.glGuiPanel):
 		self._printerConnectionManager = printerConnectionManager.PrinterConnectionManager()
 		self._colorConnectionManager = printerConnectionManager.ColorConnectionManager()
 		self._paintTriangle = -1
+		self._paintColor = (1.0, 1.0, 1.0)
 
 		self._viewport = None
 		self._modelMatrix = None
@@ -110,8 +111,7 @@ class SceneView(openglGui.glGuiPanel):
 
 		self.viewSelection = openglGui.glComboButton(self, _("View mode"), [7,19,11,15,23,23], [_("Normal"), _("Overhang"), _("Transparent"), _("X-Ray"), _("Layers"), _("Colors")], (-1,0), self.OnViewChange)
 
-		self.layerColors = openglGui.glColorRangeSelect(self, (-1, -1), 0, 1950, (1,1,1), lambda: self.updateColor())
-		self.layerColorer = openglGui.glColorPicker(self, (-1.5, -3), (1,1,1), lambda: self.layerColors.setColor(self.layerColorer.getColor()))
+		self.layerColorer = openglGui.glColorPicker(self, (-1.5, -3), self._paintColor, lambda: self.OnColorChanged())
 
 		self.youMagineButton = openglGui.glButton(self, 26, _("Share on YouMagine"), (3,0), lambda button: youmagineGui.youmagineManager(self.GetTopLevelParent(), self._scene))
 		self.youMagineButton.setDisabled(True)
@@ -129,13 +129,6 @@ class SceneView(openglGui.glGuiPanel):
 		self.OnToolSelect(0)
 		self.updateToolButtons()
 		self.updateProfileToControls()
-		self.updateColor()
-
-	def updateColor(self):
-		self._minSelectedLayer = self.layerColors.getMinSelect()
-		self._maxSelectedLayer = self.layerColors.getMaxSelect()
-		self._colorLayers = self.layerColors.getLayers()
-		self._colorColors = self.layerColors.getColors()
 
 	def loadGCodeFile(self, filename):
 		self.OnDeleteAll(None)
@@ -497,6 +490,9 @@ class SceneView(openglGui.glGuiPanel):
 		if self.paintToolButton.getSelected():
 			self.viewMode = 'paint'
 
+	def OnColorChanged(self):
+		self._paintColor = self.layerColorer.getColor()
+
 	def OnToolSelect(self, button):
 		if self.rotateToolButton.getSelected():
 			self.tool = previewTools.toolRotate(self)
@@ -550,7 +546,6 @@ class SceneView(openglGui.glGuiPanel):
 		else:
 			self.viewMode = 'normal'
 		self._engineResultView.setEnabled(self.viewMode == 'gcode')
-		self.updateLayerRange()
 		self.QueueRefresh()
 
 	def OnRotateReset(self, button):
@@ -729,7 +724,6 @@ class SceneView(openglGui.glGuiPanel):
 		wx.CallAfter(self._sceneUpdateTimer.Start, 500, True)
 		self._engine.abortEngine()
 		self._scene.updateSizeOffsets()
-		self.updateLayerRange()
 		self.QueueRefresh()
 
 	def _onRunEngine(self, e):
@@ -845,7 +839,6 @@ class SceneView(openglGui.glGuiPanel):
 		if self._zoom > numpy.max(self._machineSize) * 3:
 			self._animZoom = openglGui.animation(self, self._zoom, numpy.max(self._machineSize) * 3, 0.5)
 		self.updateModelSettingsToControls()
-		self.updateLayerRange()
 
 	def updateModelSettingsToControls(self):
 		if self._selectedObj is not None:
@@ -857,19 +850,6 @@ class SceneView(openglGui.glGuiPanel):
 			self.scaleXmmctrl.setValue(round(size[0], 2))
 			self.scaleYmmctrl.setValue(round(size[1], 2))
 			self.scaleZmmctrl.setValue(round(size[2], 2))
-
-	def updateLayerRange(self):
-		objects = self._scene.objects()
-		if self.viewMode == 'layerColors' and len(objects) > 0:
-			self._layerHeight = profile.getProfileSettingFloat('layer_height')
-			tallestObject = max(objects, key=lambda obj : obj.getSize()[2])
-			numLayers = int(math.ceil(tallestObject.getSize()[2] / self._layerHeight))
-			self.layerColors.setRange(0, max(numLayers, 1))
-			self.layerColors.setHidden(False)
-#			self.layerColorer.setHidden(False)
-		else:
-			self.layerColors.setHidden(True)
-#			self.layerColorer.setHidden(True)
 
 	def OnKeyChar(self, keyCode):
 		if self._engineResultView.OnKeyChar(keyCode):
@@ -961,7 +941,6 @@ class SceneView(openglGui.glGuiPanel):
 		self._mouseClickFocus = self._focusObj
 		if e.ButtonDClick():
 			self._mouseState = 'doubleClick'
-			self.layerColors.deselectAll()
 		else:
 			if self._mouseState == 'dragObject' and self._selectedObj is not None:
 				self._scene.pushFree(self._selectedObj)
@@ -977,8 +956,6 @@ class SceneView(openglGui.glGuiPanel):
 				if self._focusObj is not None:
 					self._selectObject(self._focusObj, False)
 					self.QueueRefresh()
-				else:
-					self.layerColors.deselectAll()
 
 	def OnMouseUp(self, e):
 		if e.LeftIsDown() or e.MiddleIsDown() or e.RightIsDown():
@@ -1363,14 +1340,6 @@ class SceneView(openglGui.glGuiPanel):
 			if self.viewMode == 'overhang':
 				self._objectOverhangShader.bind()
 				self._objectOverhangShader.setUniform('cosAngle', math.cos(math.radians(90 - profile.getProfileSettingFloat('support_angle'))))
-			elif self.viewMode == 'layerColors':
-				self._layerShader.bind()
-				self._layerShader.setUniform('num_layers', len(self._colorLayers))
-				self._layerShader.setUniform('min_selected', self._minSelectedLayer)
-				self._layerShader.setUniform('max_selected', self._maxSelectedLayer)
-				self._layerShader.setUniformIntArray('layer_starts', self._colorLayers)
-				self._layerShader.setUniformVec4Array('layer_colors', list((color[0], color[1], color[2], 1) for color in self._colorColors))
-				self._layerShader.setUniform('layer_height', self._layerHeight)
 			else:
 				self._objectShader.bind()
 
@@ -1408,12 +1377,6 @@ class SceneView(openglGui.glGuiPanel):
 							self._objectOverhangShader.setUniform('rotMatrix', obj.getMatrix() * self.tempMatrix)
 						else:
 							self._objectOverhangShader.setUniform('rotMatrix', obj.getMatrix())
-					elif self.viewMode == 'layerColors':
-						pos = obj.getPosition()
-						height = -profile.getProfileSettingFloat('object_sink')
-						offset = obj.getDrawOffset()
-						modelMatrix = openglHelpers.convert3x3MatrixTo4x4(obj.getMatrix(), [-offset[0]+pos[0], -offset[1]+pos[1], -offset[2]+height])
-						self._layerShader.setUniformMat4('model_matrix', modelMatrix)
 
 					if not self._scene.checkPlatform(obj):
 						glColor4f(0.5 * brightness, 0.5 * brightness, 0.5 * brightness, 0.8 * brightness)
@@ -1535,14 +1498,6 @@ class SceneView(openglGui.glGuiPanel):
 			glTranslate(0,-4,-10)
 			glColor4ub(60,60,60,255)
 			openglHelpers.glDrawStringCenter(_("Overhang view not working due to lack of OpenGL shaders support."))
-			glPopMatrix()
-		elif self.viewMode == 'layerColors' and not openglHelpers.hasShaderSupport():
-			glDisable(GL_DEPTH_TEST)
-			glPushMatrix()
-			glLoadIdentity()
-			glTranslate(0,-4,-10)
-			glColor4ub(60,60,60,255)
-			openglHelpers.glDrawStringCenter(_("Colors view not working due to lack of OpenGL shaders support."))
 			glPopMatrix()
 
 	def _renderObject(self, obj, brightness = 0, addSink = True, colorMode = 0):
@@ -1755,21 +1710,6 @@ class SceneView(openglGui.glGuiPanel):
 		if self._selectedObj is None:
 			return numpy.matrix(numpy.identity(3))
 		return self._selectedObj.getMatrix()
-
-
-#TODO: Put this in a seperate file
-def LayerExtents(layers):
-	total = 0
-	maxSeen = 0
-	lastTotal = 0
-	for layer in layers[1:]:
-		for stroke in layer:
-			for extent in stroke['extrusion']:
-				total += extent
-				if total > maxSeen:
-					maxSeen = total
-		yield maxSeen - lastTotal
-		lastTotal = maxSeen
 
 #TODO: Remove this or put it in a seperate file
 class shaderEditor(wx.Frame):

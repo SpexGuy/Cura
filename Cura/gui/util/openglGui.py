@@ -1226,9 +1226,9 @@ class glColorPicker(glGuiContainer):
 		offset = sliderWidth/2
 		width = glColorPicker.width
 		sliderOffsetY = glColorSlider.height/2 + width
-		self._redSlider   = glColorSlider(self, (255,0,0), initColor[0]*256, (offset + 0*sliderWidth, sliderOffsetY), lambda: self._updateColor())
-		self._greenSlider = glColorSlider(self, (0,255,0), initColor[1]*256, (offset + 1*sliderWidth, sliderOffsetY), lambda: self._updateColor())
-		self._blueSlider  = glColorSlider(self, (0,0,255), initColor[2]*256, (offset + 2*sliderWidth, sliderOffsetY), lambda: self._updateColor())
+		self._redSlider   = glColorSlider(self, (255,0,0), int(initColor[0]*256), (offset + 0*sliderWidth, sliderOffsetY), lambda: self._updateColor())
+		self._greenSlider = glColorSlider(self, (0,255,0), int(initColor[1]*256), (offset + 1*sliderWidth, sliderOffsetY), lambda: self._updateColor())
+		self._blueSlider  = glColorSlider(self, (0,0,255), int(initColor[2]*256), (offset + 2*sliderWidth, sliderOffsetY), lambda: self._updateColor())
 		self._colorSquare = glColorRect(self, (0, 0), width, width, initColor, lambda trigger, x, y: self._updateColor())
 
 	def _updateColor(self):
