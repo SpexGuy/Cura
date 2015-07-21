@@ -469,47 +469,14 @@ class SceneView(openglGui.glGuiPanel):
 	def _getColorGCode(self, progressCallback):
 		result = self._engine.getResult()
 		layers = result.waitForGCodeLayers(progressCallback)
-		totals = list(LayerExtents(layers))
+		colors = result.getGCodeColors(progressCallback)
 		colorCode = bigDataStorage.BigDataStorage()
-		colorCode.write(';LAYERS:\n')
-		for n, (layer, total) in enumerate(zip(layers, ['*'] + totals)):
-			colorCode.write(';  %d: ' % (n))
-			colorCode.write(str(filter(lambda stroke: stroke != 0, map(lambda stroke: sum(stroke['extrusion']), layer))))
-			colorCode.write(' (%s)\n' % total)
-		colorCode.write(';COLORS:\n')
-		for n in xrange(len(self._colorLayers)):
-			colorCode.write(';  %d: %02x%02x%02x\n' % (self._colorLayers[n], self._colorColors[n][0] * 255, self._colorColors[n][1] * 255, self._colorColors[n][2] * 255))
-
 		colorCode.write('M92 E%.5f\n' % (profile.getMachineSettingFloat('color_steps_per_e'),))
 		colorCode.write('M92 P%.5f\n' % (profile.getMachineSettingFloat('steps_per_e'),))
 		colorCode.write('M93 B%.5f\n' % (profile.getMachineSettingFloat('color_bodin_length'),))
 
-		numLayers = len(totals)
-
-		lastLayer = 0
-		print self._colorLayers
-		for n in xrange(len(self._colorLayers)):
-			# Calculate GCode params for color
-			color = self._colorColors[n]
-			r = color[0]
-			g = color[1]
-			b = color[2]
-
-			# Find the start and end layer
-			layer = self._colorLayers[n]
-			# Truncate to max layer
-			truncated = layer > numLayers
-			if truncated:
-				layer = numLayers
-			# Total the filament length
-			e = sum(totals[lastLayer:layer])
-			# Add the instruction
-			colorCode.write("C1 R%01.5f G%01.5f B%01.5f E%.3f ;Layers %d to %d\n" % (r, g, b, e, lastLayer, layer))
-			lastLayer = layer
-			# Done if truncated
-			if truncated:
-				colorCode.write('; Truncated!\n')
-				break
+		for extent in colors:
+			colorCode.write("C1 R%01.5f G%01.5f B%01.5f E%.3f\n" % (extent[0][0], extent[0][1], extent[0][2], extent[1]))
 
 		colorCode.seekStart()
 		return colorCode

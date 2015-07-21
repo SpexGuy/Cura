@@ -36,6 +36,7 @@ class gcode(object):
 	"""
 	def __init__(self):
 		self.regMatch = {}
+		self.colorList = None
 		self.layerList = None
 		self.extrusionAmount = 0
 		self.filename = None
@@ -74,7 +75,11 @@ class gcode(object):
 		return None
 	
 	def _load(self, gcodeFile):
+		self.colorList = []
 		self.layerList = []
+		colorLength = 0.0
+		maxColorE = 0.0
+		colorE = 0.0
 		pos = [0.0,0.0,0.0]
 		posOffset = [0.0, 0.0, 0.0]
 		currentColor = [1.0, 1.0, 1.0]
@@ -101,8 +106,14 @@ class gcode(object):
 			if line.startswith(';TYPE:'):
 				pathType = line[6:].strip()
 			elif line.startswith(';COLOR_START'):
+				if colorLength != 0:
+					self.colorList.append((currentColor, colorLength))
+				colorLength = 0
 				currentColor = map(float, line[12:].strip().split())
 			elif line.startswith(';COLOR_STOP'):
+				if colorLength != 0:
+					self.colorList.append((currentColor, colorLength))
+				colorLength = 0
 				currentColor = [1.0, 1.0, 1.0]
 
 			if ';' in line:
@@ -164,6 +175,10 @@ class gcode(object):
 						if e < 0.0:
 							moveType = 'retract'
 						currentE += e
+						colorE += e
+						if colorE > maxColorE:
+							colorLength += colorE - maxColorE
+							maxColorE = colorE
 					else:
 						e = 0.0
 					if moveType == 'move' and oldPos[2] != pos[2]:

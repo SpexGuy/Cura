@@ -146,6 +146,17 @@ class EngineResult(object):
 			self._gcodeLoadThread.start()
 		return self._gcodeInterpreter.layerList
 
+	def getGCodeColors(self, loadCallback):
+		if not self._finished:
+			return None
+		if self._gcodeInterpreter.colorList is None and self._gcodeLoadThread is None:
+			self._gcodeInterpreter.progressCallback = self._gcodeInterpreterCallback
+			self._gcodeLoadThread = threading.Thread(target=self._interpretGCode)
+			self._gcodeLoadCallback = loadCallback
+			self._gcodeLoadThread.daemon = True
+			self._gcodeLoadThread.start()
+		return self._gcodeInterpreter.colorList
+
 	def waitForGCodeLayers(self, progressCallback):
 		if not self._gcodeLoaded:
 			self.getGCodeLayers(progressCallback)
